@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ChatMessage, ChatPoll } from '@/types'
-import { MOCK_CHAT } from '@/data/mock'
+import type { ChatMessage } from '@/types'
 
 interface ChatState {
   messages: ChatMessage[]
@@ -15,8 +14,8 @@ interface ChatState {
 export const useChatStore = create<ChatState>()(
   persist(
     (set) => ({
-      messages: MOCK_CHAT,
-      pinnedId: 'c4',
+      messages: [],
+      pinnedId: null,
 
       addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 

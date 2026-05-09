@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Boletim } from '@/types'
-import { MOCK_BULLETINS } from '@/data/mock'
 
 interface BoletimState {
   bulletins: Boletim[]
@@ -13,7 +12,7 @@ interface BoletimState {
 export const useBoletimStore = create<BoletimState>()(
   persist(
     (set) => ({
-      bulletins: MOCK_BULLETINS,
+      bulletins: [],
 
       addBoletim: (b) => set((s) => ({ bulletins: [b, ...s.bulletins] })),
 

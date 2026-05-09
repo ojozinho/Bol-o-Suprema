@@ -290,84 +290,48 @@ function GroupsTab() {
   )
 }
 
-// ─── Champion tab ─────────────────────────────────────────────────────────────
+// ─── Team picker grid (shared by champion + vice) ────────────────────────────
 
-function ChampionTab() {
-  const { championPick, setChampionPick } = usePredictionStore()
-  const [confirmed, setConfirmed] = useState(false)
-
-  const handlePick = useCallback((code: string) => {
-    setChampionPick(code)
-    setConfirmed(false)
-  }, [setChampionPick])
-
+function TeamPickerGrid({
+  label, pts, pick, onPick,
+}: { label: string; pts: number; pick: string | null; onPick: (code: string) => void }) {
   return (
-    <div className="px-4 py-6 pb-24">
-      {/* Editorial heading */}
-      <div className="mb-6">
-        <div className="font-display text-4xl leading-none text-ink">CAMPEÃO</div>
-        <div className="font-serif-it text-2xl text-green-deep leading-snug">
-          quem vai ganhar a Copa?
-        </div>
-        <p className="font-mono text-[10px] text-ink-3 mt-1.5">
-          Vale 50 pontos se acertar · só pode mudar até o apito inicial
-        </p>
+    <div>
+      <div className="flex items-baseline gap-2 mb-3">
+        <span className="font-display text-2xl leading-none">{label}</span>
+        <span className="font-mono text-[9px] text-ink-3">+{pts} pontos</span>
       </div>
-
-      {/* Current pick */}
-      <AnimatePresence>
-        {championPick && (
-          <motion.div
-            key={championPick}
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 flex items-center gap-3 p-3 border-2 border-ink bg-yellow"
-          >
-            <Flag team={TEAMS[championPick]} size={36} />
-            <div className="flex-1">
-              <p className="font-mono text-[9px] tracking-eyebrow text-ink-3">SUA ESCOLHA</p>
-              <p className="font-display text-lg leading-none">{TEAMS[championPick]?.name.toUpperCase()}</p>
-            </div>
-            {!confirmed ? (
-              <button
-                onClick={() => setConfirmed(true)}
-                className="btn-ink text-[10px] px-4 py-2"
-              >
-                CONFIRMAR ✓
-              </button>
-            ) : (
-              <span className="font-mono text-[10px] text-green font-bold">SALVO ✓</span>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Team grid by group */}
-      <div className="space-y-5">
+      {pick && (
+        <div className="mb-3 flex items-center gap-2.5 p-2.5 border-2 border-ink bg-yellow">
+          <Flag team={TEAMS[pick]} size={28} />
+          <div className="flex-1">
+            <p className="font-mono text-[8px] tracking-eyebrow text-ink-3">ESCOLHIDO</p>
+            <p className="font-display text-base leading-none">{TEAMS[pick]?.name.toUpperCase()}</p>
+          </div>
+          <span className="font-mono text-[10px] text-green font-bold">✓</span>
+        </div>
+      )}
+      <div className="space-y-3">
         {WC2026_GROUPS.map(group => (
           <div key={group.id}>
-            <p className="font-mono text-[9px] tracking-eyebrow text-ink-3 mb-2">
-              GRUPO {group.id}
-            </p>
-            <div className="grid grid-cols-4 gap-2">
+            <p className="font-mono text-[8px] tracking-eyebrow text-ink-4 mb-1.5">GRUPO {group.id}</p>
+            <div className="grid grid-cols-4 gap-1.5">
               {group.teams.map(code => {
                 const team = TEAMS[code]
                 if (!team) return null
-                const selected = championPick === code
+                const selected = pick === code
                 return (
                   <motion.button
                     key={code}
-                    onClick={() => handlePick(code)}
-                    whileTap={{ scale: 0.96 }}
+                    onClick={() => onPick(code)}
+                    whileTap={{ scale: 0.95 }}
                     className={[
-                      'flex flex-col items-center gap-1.5 p-3 border-2 transition-colors',
-                      selected
-                        ? 'border-ink bg-yellow'
-                        : 'border-hairline hover:border-ink',
+                      'flex flex-col items-center gap-1 py-2 px-1 border-2 transition-colors',
+                      selected ? 'border-ink bg-yellow' : 'border-hairline hover:border-ink',
                     ].join(' ')}
                   >
-                    <Flag team={team} size={28} />
-                    <span className="font-mono text-[8px] font-bold">{code}</span>
+                    <Flag team={team} size={24} />
+                    <span className="font-mono text-[7px] font-bold">{code}</span>
                   </motion.button>
                 )
               })}
@@ -375,6 +339,113 @@ function ChampionTab() {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── Champion tab (campeão + vice + artilheiro) ───────────────────────────────
+
+function ChampionTab() {
+  const { championPick, vicePick, scorerPick, setChampionPick, setVicePick, setScorerPick } = usePredictionStore()
+  const [scorerInput, setScorerInput] = useState(scorerPick ?? '')
+  const [section, setSection] = useState<'champion' | 'vice' | 'scorer'>('champion')
+
+  const allSet = championPick && vicePick && scorerPick
+
+  return (
+    <div className="px-4 py-6 pb-24">
+      {/* Editorial heading */}
+      <div className="mb-5">
+        <div className="font-display text-4xl leading-none text-ink">APOSTAS GERAIS</div>
+        <div className="font-serif-it text-xl text-green-deep leading-snug mt-0.5">
+          obrigatórias antes da primeira partida
+        </div>
+        <p className="font-mono text-[10px] text-ink-3 mt-1.5">
+          Prazo: antes de 11 Jun · 15:00 (início da Copa)
+        </p>
+      </div>
+
+      {/* Progress */}
+      <div className="flex gap-2 mb-5">
+        {[
+          { id: 'champion' as const, label: 'CAMPEÃO', pts: 25, done: !!championPick },
+          { id: 'vice' as const,     label: 'VICE',     pts: 15, done: !!vicePick },
+          { id: 'scorer' as const,   label: 'ARTILHEIRO', pts: 10, done: !!scorerPick },
+        ].map(s => (
+          <button
+            key={s.id}
+            onClick={() => setSection(s.id)}
+            className={[
+              'flex-1 py-2.5 border-2 transition-colors',
+              section === s.id ? 'border-ink bg-ink text-paper' :
+              s.done ? 'border-green bg-green/5' : 'border-hairline hover:border-ink',
+            ].join(' ')}
+          >
+            <div className="font-mono text-[8px] tracking-eyebrow">{s.label}</div>
+            <div className="font-mono text-[8px] text-current/60">+{s.pts} pts</div>
+            {s.done && <div className="font-mono text-[8px] text-green">✓</div>}
+          </button>
+        ))}
+      </div>
+
+      {/* Section content */}
+      {section === 'champion' && (
+        <TeamPickerGrid label="CAMPEÃO" pts={25} pick={championPick} onPick={setChampionPick} />
+      )}
+
+      {section === 'vice' && (
+        <TeamPickerGrid label="VICE-CAMPEÃO" pts={15} pick={vicePick} onPick={setVicePick} />
+      )}
+
+      {section === 'scorer' && (
+        <div>
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className="font-display text-2xl leading-none">ARTILHEIRO</span>
+            <span className="font-mono text-[9px] text-ink-3">+10 pts · critério de desempate</span>
+          </div>
+          <p className="font-mono text-[10px] text-ink-3 mb-4">
+            Quem você acha que vai ser o artilheiro da Copa 2026? Esse palpite é critério de desempate — muito importante!
+          </p>
+          <div className="border-2 border-ink p-4">
+            <p className="font-mono text-[9px] tracking-eyebrow text-ink-3 mb-2">NOME DO JOGADOR</p>
+            <input
+              value={scorerInput}
+              onChange={e => setScorerInput(e.target.value)}
+              placeholder="ex: Mbappé, Vinicius Jr, Haaland..."
+              className="w-full bg-paper-deep border border-line px-3 py-2.5 font-sans text-[14px] outline-none focus:border-ink placeholder:text-ink-4"
+            />
+            <button
+              onClick={() => { if (scorerInput.trim()) setScorerPick(scorerInput.trim()) }}
+              disabled={!scorerInput.trim() || scorerInput.trim() === scorerPick}
+              className="mt-3 btn-yellow w-full text-[11px] disabled:opacity-40"
+            >
+              {scorerPick ? `ALTERAR — ${scorerPick}` : 'CONFIRMAR ARTILHEIRO ✓'}
+            </button>
+            {scorerPick && (
+              <p className="font-mono text-[10px] text-green mt-2 text-center">
+                Salvo: {scorerPick} ✓
+              </p>
+            )}
+          </div>
+          <p className="font-mono text-[9px] text-ink-4 mt-3">
+            Reg. 7: em caso de empate, vale quem mais gols fez entre os artilheiros escolhidos pelos empatados.
+          </p>
+        </div>
+      )}
+
+      {/* All done banner */}
+      {allSet && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 p-4 bg-green/10 border-2 border-green text-center"
+        >
+          <p className="font-display text-xl text-green">APOSTAS GERAIS FEITAS ✓</p>
+          <p className="font-mono text-[10px] text-green/70 mt-1">
+            Campeão: {TEAMS[championPick]?.name} · Vice: {TEAMS[vicePick]?.name} · Artilheiro: {scorerPick}
+          </p>
+        </motion.div>
+      )}
     </div>
   )
 }
