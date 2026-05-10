@@ -7,23 +7,18 @@ interface MarqueeProps {
 }
 
 export function Marquee({ items, speed = 40, color = '#0D0D0D', bg = 'transparent', separator = '·' }: MarqueeProps) {
-  const doubled = [...items, ...items]
-  const content = doubled.join(` ${separator} `)
+  const content = items.join(` ${separator} `)
+  const spanClass = 'font-mono text-[11px] font-semibold tracking-eyebrow uppercase whitespace-nowrap pr-8'
 
   return (
-    <div
-      className="overflow-hidden whitespace-nowrap"
-      style={{ background: bg }}
-    >
-      <span
-        className="inline-block animate-marquee font-mono text-[11px] font-semibold tracking-eyebrow uppercase"
-        style={{
-          color,
-          animationDuration: `${speed}s`,
-        }}
+    <div className="overflow-hidden" style={{ background: bg }}>
+      <div
+        className="inline-flex animate-marquee py-2.5"
+        style={{ color, animationDuration: `${speed}s` }}
       >
-        {content}
-      </span>
+        <span className={spanClass}>{content}</span>
+        <span className={spanClass} aria-hidden="true">{content}</span>
+      </div>
     </div>
   )
 }

@@ -10,6 +10,7 @@ import { LoginScreen } from '@/screens/Login'
 import { ProfileScreen } from '@/screens/Profile'
 import { HomeScreen } from '@/screens/Home'
 import { PredictionScreen } from '@/screens/Prediction'
+import { BracketScreen } from '@/screens/Bracket'
 import { RankingScreen } from '@/screens/Ranking'
 import { ResenhaScreen } from '@/screens/Resenha'
 import { AdminScreen } from '@/screens/Admin'
@@ -106,7 +107,7 @@ const router = createHashRouter([
         children: [
           { path: '/home', element: <HomeScreen /> },
           { path: '/boletim', element: <BoletimScreen /> },
-          { path: '/bracket', element: <Navigate to="/prediction" state={{ tab: 'bracket' }} replace /> },
+          { path: '/bracket', element: <BracketScreen /> },
           { path: '/prediction', element: <PredictionScreen /> },
           { path: '/prediction/:matchId', element: <PredictionScreen /> },
           { path: '/ranking', element: <RankingScreen /> },

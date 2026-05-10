@@ -25,7 +25,7 @@ export function ProfileScreen() {
 
 function useProfileForm() {
   const { user, updateProfile, signOut } = useAuthStore()
-  const { championPick, vicePick, scorerPick } = usePredictionStore()
+  const { championPick, vicePick, scorerPick, clearAllPredictions } = usePredictionStore()
   const navigate = useNavigate()
 
   const [firstName, setFirstName] = useState(user?.firstName ?? '')
@@ -49,6 +49,12 @@ function useProfileForm() {
     navigate('/login')
   }
 
+  const handleClearPredictions = () => {
+    if (window.confirm('Apagar todos os palpites? Esta ação não pode ser desfeita.')) {
+      clearAllPredictions()
+    }
+  }
+
   return {
     user,
     firstName, setFirstName,
@@ -57,7 +63,7 @@ function useProfileForm() {
     avatarColor, setAvatarColor,
     favoriteTeam, setFavoriteTeam,
     initials, saving,
-    handleSave, handleSignOut,
+    handleSave, handleSignOut, handleClearPredictions,
     championPick, vicePick, scorerPick,
   }
 }
@@ -250,6 +256,14 @@ function ProfileMobile() {
           {form.saving ? 'SALVANDO…' : 'SALVAR PERFIL →'}
         </button>
 
+        {/* Clear predictions */}
+        <button
+          onClick={form.handleClearPredictions}
+          className="w-full py-3 font-mono text-[11px] tracking-eyebrow text-ink-4 hover:text-red transition-colors border-2 border-hairline hover:border-red"
+        >
+          LIMPAR TODOS OS PALPITES
+        </button>
+
         {/* Logout */}
         <button
           onClick={form.handleSignOut}
@@ -363,6 +377,12 @@ function ProfileDesktop() {
                 className="btn-yellow flex-1 justify-center text-base"
               >
                 {form.saving ? 'SALVANDO…' : 'SALVAR PERFIL →'}
+              </button>
+              <button
+                onClick={form.handleClearPredictions}
+                className="btn-ghost px-4 text-[10px] text-ink-4 hover:text-red"
+              >
+                LIMPAR PALPITES
               </button>
               <button
                 onClick={form.handleSignOut}

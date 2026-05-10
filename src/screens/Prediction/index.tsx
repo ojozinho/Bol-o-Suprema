@@ -3,15 +3,14 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Flag } from '@/components/shared/Flag'
 import { usePredictionStore } from '@/stores/prediction.store'
-import { useBracketStore } from '@/stores/bracket.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { WC2026_MATCHES, WC2026_GROUPS } from '@/data/wc2026'
 import { TEAMS } from '@/data/teams'
 import { clamp, cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
-import type { Match, TeamCode } from '@/types'
+import type { Match } from '@/types'
 
-type PredTab = 'groups' | 'champion' | 'bracket'
+type PredTab = 'groups' | 'champion'
 
 const GROUP_LABELS = ['A','B','C','D','E','F','G','H','I','J','K','L'] as const
 
@@ -85,121 +84,6 @@ function computeStandings(
     if (b.gd !== a.gd) return b.gd - a.gd
     return b.gf - a.gf
   })
-}
-
-// ─── Bracket helpers ──────────────────────────────────────────────────────────
-
-function computeGroupTop2(
-  groupCode: string,
-  predictions: Record<string, { homeScore: number; awayScore: number }>
-): [string | null, string | null] {
-  const groupDef = WC2026_GROUPS.find(g => g.id === groupCode)
-  if (!groupDef) return [null, null]
-
-  const rows: Record<string, { code: string; pts: number; gf: number; ga: number; gd: number }> = {}
-  for (const code of groupDef.teams) {
-    rows[code] = { code, pts: 0, gf: 0, ga: 0, gd: 0 }
-  }
-
-  const matches = WC2026_MATCHES.filter(m => m.group === groupCode)
-  for (const m of matches) {
-    const pred = predictions[m.id]
-    if (!pred) continue
-    const { homeScore: hg, awayScore: ag } = pred
-    const home = rows[m.home.code]
-    const away = rows[m.away.code]
-    if (!home || !away) continue
-    home.gf += hg; home.ga += ag; home.gd = home.gf - home.ga
-    away.gf += ag; away.ga += hg; away.gd = away.gf - away.ga
-    if (hg > ag) { home.pts += 3 }
-    else if (hg === ag) { home.pts += 1; away.pts += 1 }
-    else { away.pts += 3 }
-  }
-
-  const sorted = Object.values(rows).sort((a, b) =>
-    b.pts !== a.pts ? b.pts - a.pts : b.gd !== a.gd ? b.gd - a.gd : b.gf - a.gf
-  )
-  return [sorted[0]?.code ?? null, sorted[1]?.code ?? null]
-}
-
-interface R16Def {
-  slotId: string
-  homeGroup: string
-  homeRank: 1 | 2
-  awayGroup: string
-  awayRank: 1 | 2
-  label: string
-}
-
-const R16_DEFS: R16Def[] = [
-  { slotId: 'r16_1',  homeGroup: 'A', homeRank: 1, awayGroup: 'B', awayRank: 2, label: 'O1' },
-  { slotId: 'r16_2',  homeGroup: 'C', homeRank: 1, awayGroup: 'D', awayRank: 2, label: 'O2' },
-  { slotId: 'r16_3',  homeGroup: 'E', homeRank: 1, awayGroup: 'F', awayRank: 2, label: 'O3' },
-  { slotId: 'r16_4',  homeGroup: 'G', homeRank: 1, awayGroup: 'H', awayRank: 2, label: 'O4' },
-  { slotId: 'r16_5',  homeGroup: 'I', homeRank: 1, awayGroup: 'J', awayRank: 2, label: 'O5' },
-  { slotId: 'r16_6',  homeGroup: 'K', homeRank: 1, awayGroup: 'L', awayRank: 2, label: 'O6' },
-  { slotId: 'r16_7',  homeGroup: 'B', homeRank: 1, awayGroup: 'A', awayRank: 2, label: 'O7' },
-  { slotId: 'r16_8',  homeGroup: 'D', homeRank: 1, awayGroup: 'C', awayRank: 2, label: 'O8' },
-  { slotId: 'r16_9',  homeGroup: 'F', homeRank: 1, awayGroup: 'E', awayRank: 2, label: 'O9' },
-  { slotId: 'r16_10', homeGroup: 'H', homeRank: 1, awayGroup: 'G', awayRank: 2, label: 'O10' },
-  { slotId: 'r16_11', homeGroup: 'J', homeRank: 1, awayGroup: 'I', awayRank: 2, label: 'O11' },
-  { slotId: 'r16_12', homeGroup: 'L', homeRank: 1, awayGroup: 'K', awayRank: 2, label: 'O12' },
-  { slotId: 'r16_13', homeGroup: 'A', homeRank: 2, awayGroup: 'C', awayRank: 2, label: 'O13' },
-  { slotId: 'r16_14', homeGroup: 'B', homeRank: 2, awayGroup: 'D', awayRank: 2, label: 'O14' },
-  { slotId: 'r16_15', homeGroup: 'E', homeRank: 2, awayGroup: 'G', awayRank: 2, label: 'O15' },
-  { slotId: 'r16_16', homeGroup: 'I', homeRank: 2, awayGroup: 'K', awayRank: 2, label: 'O16' },
-]
-
-const QF_DEFS = [
-  { id: 'qf_1', label: 'Q1', homeR16: 'r16_1',  awayR16: 'r16_2'  },
-  { id: 'qf_2', label: 'Q2', homeR16: 'r16_3',  awayR16: 'r16_4'  },
-  { id: 'qf_3', label: 'Q3', homeR16: 'r16_5',  awayR16: 'r16_6'  },
-  { id: 'qf_4', label: 'Q4', homeR16: 'r16_7',  awayR16: 'r16_8'  },
-  { id: 'qf_5', label: 'Q5', homeR16: 'r16_9',  awayR16: 'r16_10' },
-  { id: 'qf_6', label: 'Q6', homeR16: 'r16_11', awayR16: 'r16_12' },
-  { id: 'qf_7', label: 'Q7', homeR16: 'r16_13', awayR16: 'r16_14' },
-  { id: 'qf_8', label: 'Q8', homeR16: 'r16_15', awayR16: 'r16_16' },
-]
-
-const SF_DEFS = [
-  { id: 'sf_1', label: 'SF1', homeQF: 'qf_1', awayQF: 'qf_2' },
-  { id: 'sf_2', label: 'SF2', homeQF: 'qf_3', awayQF: 'qf_4' },
-  { id: 'sf_3', label: 'SF3', homeQF: 'qf_5', awayQF: 'qf_6' },
-  { id: 'sf_4', label: 'SF4', homeQF: 'qf_7', awayQF: 'qf_8' },
-]
-
-function useBracketR16Teams(
-  predMap: Record<string, { homeScore: number; awayScore: number }>
-): Record<string, { home: string | null; away: string | null }> {
-  return useMemo(() => {
-    const groupTop2: Record<string, [string | null, string | null]> = {}
-    for (const g of GROUP_LABELS) {
-      groupTop2[g] = computeGroupTop2(g, predMap)
-    }
-    const result: Record<string, { home: string | null; away: string | null }> = {}
-    for (const def of R16_DEFS) {
-      result[def.slotId] = {
-        home: def.homeRank === 1 ? (groupTop2[def.homeGroup]?.[0] ?? null) : (groupTop2[def.homeGroup]?.[1] ?? null),
-        away: def.awayRank === 1 ? (groupTop2[def.awayGroup]?.[0] ?? null) : (groupTop2[def.awayGroup]?.[1] ?? null),
-      }
-    }
-    return result
-  }, [predMap])
-}
-
-function resolveBracketTeams(
-  slotId: string,
-  r16Teams: Record<string, { home: string | null; away: string | null }>,
-  picks: Record<string, string>
-): { home: string | null; away: string | null } {
-  if (slotId.startsWith('r16_')) return r16Teams[slotId] ?? { home: null, away: null }
-  const qf = QF_DEFS.find(s => s.id === slotId)
-  if (qf) return { home: picks[qf.homeR16] ?? null, away: picks[qf.awayR16] ?? null }
-  const sf = SF_DEFS.find(s => s.id === slotId)
-  if (sf) return { home: picks[sf.homeQF] ?? null, away: picks[sf.awayQF] ?? null }
-  if (slotId === 'final_1') return { home: picks['sf_1'] ?? null, away: picks['sf_2'] ?? null }
-  if (slotId === 'third_1') return { home: picks['sf_3'] ?? null, away: picks['sf_4'] ?? null }
-  return { home: null, away: null }
 }
 
 // ─── Score stepper ────────────────────────────────────────────────────────────
@@ -838,230 +722,6 @@ function ChampionTab() {
   )
 }
 
-// ─── Bracket matchup card ─────────────────────────────────────────────────────
-
-function MatchupCard({ slotId, home, away, pick, onPick, label, note }: {
-  slotId: string
-  home: string | null
-  away: string | null
-  pick: string | undefined
-  onPick: (slotId: string, winner: string) => void
-  label: string
-  note?: string
-}) {
-  const homeTeam = home ? TEAMS[home] : null
-  const awayTeam = away ? TEAMS[away] : null
-  const canPick = !!home && !!away
-
-  return (
-    <div className={cn(
-      'border-2 bg-paper',
-      pick ? 'border-ink' : canPick ? 'border-ink' : 'border-hairline opacity-60'
-    )}>
-      <div className="px-2 py-1 bg-paper-deep border-b border-hairline flex items-center justify-between">
-        <span className="font-mono text-[8px] text-ink-4 font-bold">{label}</span>
-        {note && <span className="font-mono text-[7px] text-ink-4">{note}</span>}
-      </div>
-      {[
-        { code: home, team: homeTeam },
-        { code: away, team: awayTeam },
-      ].map(({ code, team }, i) => (
-        <button
-          key={i}
-          onClick={() => code && canPick && onPick(slotId, code)}
-          disabled={!canPick || !code}
-          className={cn(
-            'w-full flex items-center gap-2 px-2.5 py-2 transition-colors',
-            i === 0 ? 'border-b border-hairline' : '',
-            pick === code ? 'bg-yellow' : canPick && code ? 'hover:bg-hairline cursor-pointer' : ''
-          )}
-        >
-          {team && code ? (
-            <>
-              <Flag team={team} size={18} />
-              <span className="font-mono text-[10px] font-bold flex-1 text-left truncate">{code}</span>
-              {pick === code && <span className="font-mono text-[9px] font-bold text-ink">★</span>}
-            </>
-          ) : (
-            <span className="font-mono text-[9px] text-ink-4 flex-1">TBD</span>
-          )}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-// ─── Bracket tab (mata-mata) ──────────────────────────────────────────────────
-
-function BracketTab() {
-  const { predictions } = usePredictionStore()
-  const { picks, setPick } = useBracketStore()
-
-  const predMap = useMemo(() => {
-    const m: Record<string, { homeScore: number; awayScore: number }> = {}
-    for (const [id, pred] of Object.entries(predictions)) {
-      m[id] = { homeScore: pred.homeScore, awayScore: pred.awayScore }
-    }
-    return m
-  }, [predictions])
-
-  const r16Teams = useBracketR16Teams(predMap)
-  const getTeams = (slotId: string) => resolveBracketTeams(slotId, r16Teams, picks)
-  const handlePick = (slotId: string, winner: string) => setPick(slotId, winner as TeamCode)
-
-  const hasGroupPreds = Object.keys(predictions).length > 0
-  const champion = picks['final_1']
-
-  return (
-    <div className="pb-24">
-      {/* Header */}
-      <div className="px-4 py-5 border-b border-hairline">
-        <div className="font-display text-3xl leading-none">MINHA CHAVE</div>
-        <div className="font-serif-it text-lg text-ink-3 mt-0.5">quem vai longe no mata-mata?</div>
-        {!hasGroupPreds && (
-          <div className="mt-3 p-3 border border-yellow/40 bg-yellow/5">
-            <p className="font-mono text-[10px] text-ink-3">
-              💡 Preencha os palpites dos grupos primeiro — as equipes das oitavas são calculadas automaticamente.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* R16 */}
-      <div className="px-4 pt-5 pb-3">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="font-display text-xl">OITAVAS</span>
-          <span className="font-serif-it text-sm text-ink-3">de final · 27 Jun</span>
-        </div>
-        <p className="font-mono text-[9px] text-ink-4 mb-4 tracking-eyebrow">
-          EQUIPES BASEADAS NOS SEUS PALPITES DE GRUPO · CLIQUE PARA ESCOLHER O VENCEDOR
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {R16_DEFS.map(def => {
-            const { home, away } = getTeams(def.slotId)
-            return (
-              <MatchupCard
-                key={def.slotId}
-                slotId={def.slotId}
-                home={home}
-                away={away}
-                pick={picks[def.slotId]}
-                onPick={handlePick}
-                label={def.label}
-                note={`${def.homeGroup}1×${def.awayGroup}2`}
-              />
-            )
-          })}
-        </div>
-      </div>
-
-      {/* QF */}
-      <div className="px-4 pt-4 pb-3 border-t-2 border-hairline mt-2">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="font-display text-xl">QUARTAS</span>
-          <span className="font-serif-it text-sm text-ink-3">de final · 4 Jul</span>
-        </div>
-        <p className="font-mono text-[9px] text-ink-4 mb-4 tracking-eyebrow">
-          VENCEDORES DAS OITAVAS
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {QF_DEFS.map(slot => {
-            const { home, away } = getTeams(slot.id)
-            return (
-              <MatchupCard
-                key={slot.id}
-                slotId={slot.id}
-                home={home}
-                away={away}
-                pick={picks[slot.id]}
-                onPick={handlePick}
-                label={slot.label}
-              />
-            )
-          })}
-        </div>
-      </div>
-
-      {/* SF */}
-      <div className="px-4 pt-4 pb-3 border-t-2 border-hairline mt-2">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="font-display text-xl">SEMIFINAIS</span>
-          <span className="font-serif-it text-sm text-ink-3">14 Jul</span>
-        </div>
-        <p className="font-mono text-[9px] text-ink-4 mb-4 tracking-eyebrow">
-          VENCEDORES DAS QUARTAS
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {SF_DEFS.map(slot => {
-            const { home, away } = getTeams(slot.id)
-            return (
-              <MatchupCard
-                key={slot.id}
-                slotId={slot.id}
-                home={home}
-                away={away}
-                pick={picks[slot.id]}
-                onPick={handlePick}
-                label={slot.label}
-              />
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Final + 3rd */}
-      <div className="px-4 pt-4 pb-4 border-t-2 border-hairline mt-2">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="font-display text-xl">FINAL</span>
-          <span className="font-serif-it text-sm text-ink-3">& 3° lugar · 19 Jul</span>
-        </div>
-        <p className="font-mono text-[9px] text-ink-4 mb-4 tracking-eyebrow">
-          LOS ANGELES · FINAL DO MUNDO
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <p className="font-mono text-[8px] tracking-eyebrow text-ink-4 mb-1.5">GRANDE FINAL</p>
-            <MatchupCard
-              slotId="final_1"
-              home={getTeams('final_1').home}
-              away={getTeams('final_1').away}
-              pick={picks['final_1']}
-              onPick={handlePick}
-              label="FINAL"
-            />
-          </div>
-          <div>
-            <p className="font-mono text-[8px] tracking-eyebrow text-ink-4 mb-1.5">3° LUGAR</p>
-            <MatchupCard
-              slotId="third_1"
-              home={getTeams('third_1').home}
-              away={getTeams('third_1').away}
-              pick={picks['third_1']}
-              onPick={handlePick}
-              label="3° LUG"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Champion banner */}
-      {champion && TEAMS[champion] && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mb-4 p-4 bg-yellow border-2 border-ink text-center"
-        >
-          <p className="font-mono text-[8px] tracking-eyebrow text-ink-3 mb-2">MEU CAMPEÃO</p>
-          <div className="flex items-center justify-center gap-3">
-            <Flag team={TEAMS[champion]} size={40} />
-            <span className="font-display text-3xl">{TEAMS[champion].name.toUpperCase()}</span>
-          </div>
-        </motion.div>
-      )}
-    </div>
-  )
-}
-
 // ─── Desktop sidebar ──────────────────────────────────────────────────────────
 
 function DesktopGroupView({
@@ -1189,7 +849,8 @@ function DesktopGroupSidebar({
 export function PredictionScreen() {
   const { matchId } = useParams<{ matchId?: string }>()
   const location = useLocation()
-  const initialTab = (location.state as { tab?: PredTab } | null)?.tab ?? 'groups'
+  const rawTab = (location.state as { tab?: string } | null)?.tab
+  const initialTab: PredTab = rawTab === 'champion' ? 'champion' : 'groups'
   const [tab, setTab] = useState<PredTab>(initialTab)
 
   const initialGroup = useMemo(() => {
@@ -1225,7 +886,6 @@ export function PredictionScreen() {
   const tabs = [
     { id: 'groups' as const,   label: 'GRUPOS' },
     { id: 'champion' as const, label: 'APOSTAS GERAIS' },
-    { id: 'bracket' as const,  label: 'MATA-MATA' },
   ]
 
   return (
@@ -1247,7 +907,7 @@ export function PredictionScreen() {
         </div>
       </div>
 
-      {/* ── Tabs ── */}
+      {/* ── Tabs + Chave link ── */}
       <div className="border-b border-hairline flex sticky top-0 lg:top-14 bg-paper z-20">
         {tabs.map(t => (
           <button
@@ -1261,6 +921,12 @@ export function PredictionScreen() {
             {t.label}
           </button>
         ))}
+        <button
+          onClick={() => navigate('/bracket')}
+          className="px-4 py-3 font-mono text-[10px] font-bold tracking-eyebrow text-ink-4 hover:text-ink border-b-2 border-transparent transition-colors border-l border-hairline flex-shrink-0"
+        >
+          MINHA CHAVE ↗
+        </button>
       </div>
 
       {/* ── Content ── */}
@@ -1301,20 +967,6 @@ export function PredictionScreen() {
           >
             <div className="md:max-w-2xl md:mx-auto">
               <ChampionTab />
-            </div>
-          </motion.div>
-        )}
-
-        {tab === 'bracket' && (
-          <motion.div
-            key="bracket"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
-          >
-            <div className="max-w-screen-xl mx-auto">
-              <BracketTab />
             </div>
           </motion.div>
         )}

@@ -200,7 +200,7 @@ function HomeMobile() {
             <div className="font-serif-it text-sm text-ink-3">oitavas · quartas · semi · final</div>
           </div>
           <button
-            onClick={() => navigate('/prediction', { state: { tab: 'bracket' } })}
+            onClick={() => navigate('/bracket')}
             className="btn-ink text-[11px] px-4 py-2.5 flex-shrink-0"
           >
             PALPITAR →
@@ -414,7 +414,7 @@ function HomeDesktop() {
                 Palpite no mata-mata — oitavas a partir de 27 Jun. Seus palpites de grupo determinam as equipes.
               </p>
               <button
-                onClick={() => navigate('/prediction', { state: { tab: 'bracket' } })}
+                onClick={() => navigate('/bracket')}
                 className="btn-yellow w-full justify-center"
               >
                 MINHA CHAVE →

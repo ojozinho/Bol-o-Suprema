@@ -26,22 +26,9 @@ export const MOCK_UPCOMING = WC2026_MATCHES          // all 72 group stage match
 export const MOCK_PAST: typeof WC2026_MATCHES = []  // no finished matches yet
 
 // ─── Ranking ──────────────────────────────────────────────────────────────────
-// Pre-tournament preview data — will be replaced by live scores on June 11
+// Empty until tournament starts (June 11)
 
-export const MOCK_RANKING: RankingEntry[] = [
-  { rank: 1,  userId: 'u2',     name: 'Felipe Costa',   dept: 'Dev',       initials: 'FC', color: '#E4572E', pts: 127, mov: '+2' as '+2', correct: 12, exact: 4, streak: 5 },
-  { rank: 2,  userId: 'u3',     name: 'Ana Ribeiro',    dept: 'Marketing', initials: 'AR', color: '#8338EC', pts: 119, mov: '+1' as '+1', correct: 11, exact: 3, streak: 3 },
-  { rank: 3,  userId: 'u4',     name: 'Lucas Mendes',   dept: 'Product',   initials: 'LM', color: '#118AB2', pts: 108, mov: '-1' as '-1', correct: 10, exact: 4, streak: 2 },
-  { rank: 4,  userId: 'u5',     name: 'Carla Teixeira', dept: 'Data',      initials: 'CT', color: '#FF4E6A', pts: 97,  mov: '—',           correct: 9,  exact: 2, streak: 1 },
-  { rank: 5,  userId: 'user-1', name: 'João Silva',     dept: 'Design',    initials: 'JS', color: '#00A651', pts: 89,  mov: '+3' as '+3', correct: 8,  exact: 3, streak: 4, isYou: true },
-  { rank: 6,  userId: 'u6',     name: 'Bruno Alves',    dept: 'Dev',       initials: 'BA', color: '#F4A261', pts: 81,  mov: '-2' as '-2', correct: 8,  exact: 1, streak: 0 },
-  { rank: 7,  userId: 'u7',     name: 'Marina Fontes',  dept: 'Design',    initials: 'MF', color: '#2EC4B6', pts: 74,  mov: '+1' as '+1', correct: 7,  exact: 2, streak: 2 },
-  { rank: 8,  userId: 'u8',     name: 'Rafael Lima',    dept: 'Marketing', initials: 'RL', color: '#E9C46A', pts: 63,  mov: '—',           correct: 6,  exact: 2, streak: 1 },
-  { rank: 9,  userId: 'u9',     name: 'Juliana Pires',  dept: 'Product',   initials: 'JP', color: '#A8DADC', pts: 54,  mov: '-1' as '-1', correct: 5,  exact: 1, streak: 0 },
-  { rank: 10, userId: 'u10',    name: 'Diego Santos',   dept: 'Data',      initials: 'DS', color: '#6D6875', pts: 43,  mov: '+2' as '+2', correct: 4,  exact: 1, streak: 1 },
-  { rank: 11, userId: 'u11',    name: 'Thais Nobre',    dept: 'Dev',       initials: 'TN', color: '#B5838D', pts: 31,  mov: '—',           correct: 3,  exact: 0, streak: 0 },
-  { rank: 12, userId: 'u12',    name: 'Pedro Rocha',    dept: 'Design',    initials: 'PR', color: '#457B9D', pts: 18,  mov: '-1' as '-1', correct: 2,  exact: 0, streak: 0 },
-]
+export const MOCK_RANKING: RankingEntry[] = []
 
 // ─── Bracket ─────────────────────────────────────────────────────────────────
 // R16 slots labelled by group advancement (TBD until groups complete)
