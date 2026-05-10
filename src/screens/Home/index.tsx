@@ -13,6 +13,8 @@ import { TEAMS } from '@/data/teams'
 import { fmtPts, cn } from '@/lib/utils'
 import { fetchFeaturedVideos } from '@/lib/scorebat'
 import type { ScorebatVideo } from '@/lib/scorebat'
+import { fetchWC26News, isConfigured as newsConfigured } from '@/lib/footballnews'
+import type { FootballNewsItem } from '@/lib/footballnews'
 
 // ─── Rotating hero background ─────────────────────────────────────────────────
 
@@ -105,6 +107,158 @@ function VideoHighlights() {
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── Copa 2026 news ────────────────────────────────────────────────────────────
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const h = Math.floor(diff / 3_600_000)
+  if (h < 1) return 'agora'
+  if (h < 24) return `${h}h atrás`
+  return `${Math.floor(h / 24)}d atrás`
+}
+
+function WC26News({ compact = false }: { compact?: boolean }) {
+  const [news, setNews] = useState<FootballNewsItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [featured, setFeatured] = useState<FootballNewsItem | null>(null)
+
+  useEffect(() => {
+    if (!newsConfigured()) { setLoading(false); return }
+    fetchWC26News(compact ? 6 : 10).then(items => {
+      setNews(items)
+      setFeatured(items[0] ?? null)
+      setLoading(false)
+    })
+  }, [compact])
+
+  if (!newsConfigured() || (!loading && news.length === 0)) return null
+
+  return (
+    <div className="border-2 border-ink">
+      {/* Header */}
+      <div className="px-4 py-2.5 border-b border-hairline flex items-baseline justify-between bg-ink text-paper">
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-display text-base">COPA 2026</span>
+          <span className="font-serif-it text-sm text-paper/50">últimas notícias</span>
+        </div>
+        <span className="font-mono text-[8px] text-paper/30 tracking-eyebrow">ao vivo</span>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <span className="font-mono text-[10px] text-ink-4 animate-pulse tracking-eyebrow">CARREGANDO…</span>
+        </div>
+      ) : compact ? (
+        /* Compact list (mobile) */
+        <div className="divide-y divide-hairline">
+          {news.map(item => (
+            <a
+              key={item.url}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-3 px-4 py-3 hover:bg-paper-deep transition-colors group"
+            >
+              {item.image && (
+                <img
+                  src={item.image}
+                  alt=""
+                  className="w-16 h-12 object-cover flex-shrink-0 border border-hairline"
+                  onError={e => (e.currentTarget.style.display = 'none')}
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-mono text-[11px] font-bold text-ink leading-tight line-clamp-2 group-hover:underline">
+                  {item.title}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="font-mono text-[8px] text-ink-4 tracking-eyebrow">{item.source}</span>
+                  <span className="font-mono text-[8px] text-ink-4">·</span>
+                  <span className="font-mono text-[8px] text-ink-4">{timeAgo(item.publishedAt)}</span>
+                </div>
+              </div>
+              <span className="font-mono text-[11px] text-ink-4 group-hover:text-ink transition-colors flex-shrink-0 self-center">→</span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        /* Full layout (desktop): featured + list */
+        <div className="grid grid-cols-[1fr_300px]">
+          {/* Featured */}
+          {featured && (
+            <a
+              href={featured.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative group overflow-hidden border-r border-hairline block"
+              style={{ minHeight: 240 }}
+            >
+              {featured.image && (
+                <img
+                  src={featured.image}
+                  alt=""
+                  className="w-full h-full object-cover absolute inset-0 group-hover:scale-105 transition-transform duration-500"
+                  onError={e => (e.currentTarget.style.display = 'none')}
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-5">
+                <div className="font-mono text-[8px] text-yellow tracking-eyebrow mb-1.5">
+                  {featured.source} · {timeAgo(featured.publishedAt)}
+                </div>
+                <h3 className="font-display text-xl text-paper leading-tight group-hover:text-yellow transition-colors">
+                  {featured.title}
+                </h3>
+                {featured.tags.length > 0 && (
+                  <div className="flex gap-1.5 mt-2 flex-wrap">
+                    {featured.tags.slice(0, 3).map(t => (
+                      <span key={t} className="font-mono text-[7px] text-paper/50 tracking-eyebrow bg-paper/10 px-1.5 py-0.5">
+                        {t.toUpperCase()}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </a>
+          )}
+
+          {/* Side list */}
+          <div className="divide-y divide-hairline overflow-hidden">
+            {news.slice(1, 7).map(item => (
+              <a
+                key={item.url}
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2.5 px-3 py-3 hover:bg-paper-deep transition-colors group"
+              >
+                {item.image && (
+                  <img
+                    src={item.image}
+                    alt=""
+                    className="w-14 h-10 object-cover flex-shrink-0 border border-hairline"
+                    onError={e => (e.currentTarget.style.display = 'none')}
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-[10px] font-bold text-ink leading-tight line-clamp-2 group-hover:underline">
+                    {item.title}
+                  </p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="font-mono text-[7px] text-ink-4">{item.source}</span>
+                    <span className="font-mono text-[7px] text-ink-4">·</span>
+                    <span className="font-mono text-[7px] text-ink-4">{timeAgo(item.publishedAt)}</span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -453,6 +607,9 @@ function HomeMobile() {
           </button>
         </div>
 
+        {/* ── Notícias Copa 2026 ── */}
+        <WC26News compact />
+
         {/* ── Destaques do futebol ── */}
         <VideoHighlights />
 
@@ -646,6 +803,9 @@ function HomeDesktop() {
           {/* Resenha CTA */}
           <ResenhaCard />
         </div>
+
+        {/* ── Notícias Copa 2026 — full layout ── */}
+        <WC26News />
 
         {/* ── Destaques do futebol — full width ── */}
         <VideoHighlights />
