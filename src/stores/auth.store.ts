@@ -53,8 +53,10 @@ interface AuthState {
   isLoading: boolean
   isAuthenticated: boolean
   profileComplete: boolean
+  rememberMe: boolean
 
   setUser: (user: AppUser | null) => void
+  setRememberMe: (v: boolean) => void
   sendOtp: (email: string) => Promise<{ error?: string }>
   verifyOtp: (email: string, token: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
@@ -72,6 +74,7 @@ export const useAuthStore = create<AuthState>()(
       isLoading: true,
       isAuthenticated: false,
       profileComplete: false,
+      rememberMe: true,
 
       setUser: (user) =>
         set({
@@ -80,6 +83,8 @@ export const useAuthStore = create<AuthState>()(
           profileComplete: !!(user?.firstName && user?.dept),
           isLoading: false,
         }),
+
+      setRememberMe: (v) => set({ rememberMe: v }),
 
       sendOtp: async (email) => {
         const normalized = email.trim().toLowerCase()
@@ -91,7 +96,14 @@ export const useAuthStore = create<AuthState>()(
           email: normalized,
           options: { shouldCreateUser: true },
         })
-        return error ? { error: error.message } : {}
+        if (error) {
+          const msg = error.message.toLowerCase()
+          if (msg.includes('rate limit') || msg.includes('rate_limit') || msg.includes('too many')) {
+            return { error: 'Muitas tentativas. Aguarde alguns minutos antes de solicitar um novo código.' }
+          }
+          return { error: error.message }
+        }
+        return {}
       },
 
       verifyOtp: async (email, token) => {
@@ -109,6 +121,12 @@ export const useAuthStore = create<AuthState>()(
         if (error) return { error: 'Código inválido ou expirado.' }
         if (!data.user) return { error: 'Erro ao validar código.' }
 
+        // Se "manter conectado" estiver desmarcado, usamos sessionStorage
+        // (limpo ao fechar o browser) para rastrear a sessão atual
+        if (!get().rememberMe) {
+          sessionStorage.setItem('bolao-session', data.user.id)
+        }
+
         const { data: profile } = await supabase
           .from('users').select('*').eq('id', data.user.id).single()
 
@@ -122,7 +140,6 @@ export const useAuthStore = create<AuthState>()(
           })
           syncPredictions(user.id)
         } else {
-          // First login — stub until profile is completed
           const stub: AppUser = {
             id: data.user.id,
             email: data.user.email ?? email,
@@ -161,6 +178,19 @@ export const useAuthStore = create<AuthState>()(
         }
         const { data } = await supabase.auth.getSession()
         if (data.session?.user) {
+          // Se o usuário não quis "manter conectado", verificamos se há uma
+          // entrada em sessionStorage (apagada ao fechar o browser). Sem ela
+          // significa que o browser foi fechado e reaberto → deslogar.
+          const rememberMe = get().rememberMe
+          if (!rememberMe) {
+            const sessionId = sessionStorage.getItem('bolao-session')
+            if (!sessionId) {
+              await supabase.auth.signOut()
+              set({ user: null, isAuthenticated: false, isLoading: false })
+              return
+            }
+          }
+
           const { data: profile } = await supabase
             .from('users').select('*').eq('id', data.session.user.id).single()
           const user = profile ? mapUser(profile as UserRow) : null
@@ -226,7 +256,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'bolao-auth',
-      partialize: (state) => ({ user: state.user }),
+      partialize: (state) => ({ user: state.user, rememberMe: state.rememberMe }),
     }
   )
 )

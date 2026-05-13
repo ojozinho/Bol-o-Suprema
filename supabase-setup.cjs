@@ -479,6 +479,7 @@ async function main() {
     enable_signup:          true,
     mailer_otp_exp:         600,   // 10 min
     mailer_otp_length:      6,     // código de 6 dígitos
+    rate_limit_email_sent:  10,    // até 10 e-mails por hora por endereço
     site_url:               SITE_URL,
     mailer_templates_magic_link_subject: 'Seu código de acesso ao Bolão Suprema',
     mailer_templates_magic_link_content: emailTemplate,

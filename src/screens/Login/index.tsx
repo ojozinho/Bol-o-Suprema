@@ -12,7 +12,7 @@ import { asset } from '@/lib/utils'
 type Step = 'email' | 'code'
 
 function useOtpFlow() {
-  const { sendOtp, verifyOtp } = useAuthStore()
+  const { sendOtp, verifyOtp, rememberMe, setRememberMe } = useAuthStore()
   const navigate = useNavigate()
 
   const [step, setStep] = useState<Step>('email')
@@ -79,7 +79,7 @@ function useOtpFlow() {
   return {
     step, email, setEmail, code, setCode,
     error, loading, canSendEmail, codeComplete,
-    resendCooldown,
+    resendCooldown, rememberMe, setRememberMe,
     handleSendOtp, handleVerify, handleResend, handleBack,
   }
 }
@@ -197,7 +197,17 @@ function LoginMobile() {
                 {f.loading ? 'ENVIANDO…' : 'RECEBER CÓDIGO →'}
               </button>
 
-              <p className="font-mono text-[10px] text-paper/30 tracking-eyebrow text-center mt-6">
+              <label className="flex items-center gap-2 mt-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={f.rememberMe}
+                  onChange={e => f.setRememberMe(e.target.checked)}
+                  className="w-4 h-4 accent-yellow"
+                />
+                <span className="font-mono text-[10px] text-paper/50">Manter conectado</span>
+              </label>
+
+              <p className="font-mono text-[10px] text-paper/30 tracking-eyebrow text-center mt-5">
                 ACESSO RESTRITO À SUPREMA GAMING · USO INTERNO
               </p>
             </motion.div>
@@ -348,7 +358,17 @@ function LoginDesktop() {
                 {f.loading ? 'ENVIANDO…' : 'RECEBER CÓDIGO →'}
               </button>
 
-              <p className="font-mono text-[10px] text-ink-4 text-center mt-5">
+              <label className="flex items-center gap-2 mt-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={f.rememberMe}
+                  onChange={e => f.setRememberMe(e.target.checked)}
+                  className="w-4 h-4 accent-yellow"
+                />
+                <span className="font-mono text-[10px] text-ink-4">Manter conectado</span>
+              </label>
+
+              <p className="font-mono text-[10px] text-ink-4 text-center mt-4">
                 Acesso restrito a colaboradores da Suprema Gaming.
               </p>
             </motion.div>
