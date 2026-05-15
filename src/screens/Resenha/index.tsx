@@ -479,7 +479,7 @@ function ChatInput({
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
 export function ResenhaScreen() {
-  const { messages, pinnedId, lastError, addMessage, clearError, setPinned, voteOnPoll } = useChatStore()
+  const { messages, pinnedId, lastError, addMessage, clearError, setPinned, voteOnPoll, deleteMessage } = useChatStore()
   const [gifOpen, setGifOpen] = useState(false)
   const [pollOpen, setPollOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -638,24 +638,39 @@ export function ResenhaScreen() {
             className="relative group"
             onMouseEnter={() => setHoveredId(m.id)}
             onMouseLeave={() => setHoveredId(null)}
+            onContextMenu={isAdmin ? (e) => { e.preventDefault(); setHoveredId(m.id) } : undefined}
           >
             <MessageRow m={m} userVotes={userVotes} onVote={(optId) => vote(m.id, optId)} />
 
-            {/* Admin pin button (on hover, non-poll messages) */}
-            {isAdmin && hoveredId === m.id && m.type !== 'poll' && (
-              <motion.button
+            {/* Admin action buttons (on hover) */}
+            {isAdmin && hoveredId === m.id && (
+              <motion.div
                 initial={{ opacity: 0, scale: 0.92 }}
                 animate={{ opacity: 1, scale: 1 }}
-                onClick={() => togglePin(m.id)}
-                className={cn(
-                  'absolute -top-1 right-0 font-mono text-[9px] px-2 py-1 border z-10',
-                  pinnedId === m.id
-                    ? 'bg-yellow border-ink text-ink'
-                    : 'bg-paper border-line text-ink-3 hover:border-ink hover:text-ink'
-                )}
+                className="absolute -top-1 right-0 flex gap-1 z-10"
               >
-                {pinnedId === m.id ? 'DESAFIXAR' : 'FIXAR'}
-              </motion.button>
+                {m.type !== 'poll' && (
+                  <button
+                    onClick={() => togglePin(m.id)}
+                    className={cn(
+                      'font-mono text-[9px] px-2 py-1 border',
+                      pinnedId === m.id
+                        ? 'bg-yellow border-ink text-ink'
+                        : 'bg-paper border-line text-ink-3 hover:border-ink hover:text-ink'
+                    )}
+                  >
+                    {pinnedId === m.id ? 'DESAFIXAR' : 'FIXAR'}
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (window.confirm('Apagar esta mensagem?')) deleteMessage(m.id)
+                  }}
+                  className="font-mono text-[9px] px-2 py-1 border bg-paper border-line text-red/70 hover:border-red hover:text-red"
+                >
+                  ✕ APAGAR
+                </button>
+              </motion.div>
             )}
           </div>
         ))}

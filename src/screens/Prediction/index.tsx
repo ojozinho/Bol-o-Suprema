@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Flag } from '@/components/shared/Flag'
 import { usePredictionStore } from '@/stores/prediction.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
-import { WC2026_MATCHES, WC2026_GROUPS } from '@/data/wc2026'
+import { WC2026_MATCHES, WC2026_GROUPS, isBettingOpen } from '@/data/wc2026'
 import { TEAMS } from '@/data/teams'
 import { clamp, cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
@@ -128,8 +128,8 @@ function MatchRow({ match, onScoreChange }: { match: Match; onScoreChange?: () =
   const [home, setHome] = useState(draft?.home ?? existing?.homeScore ?? 0)
   const [away, setAway] = useState(draft?.away ?? existing?.awayScore ?? 0)
 
-  const isPickable = match.status === 'open' || match.status === 'scheduled'
-  const isLocked = match.status === 'locked'
+  const isPickable = isBettingOpen(match)
+  const isLocked = match.status === 'locked' || (!isPickable && (match.status === 'open' || match.status === 'scheduled'))
   const isLive = match.status === 'live'
   const isDone = match.status === 'finished'
   const hasPick = !!existing
@@ -211,7 +211,7 @@ function MatchRow({ match, onScoreChange }: { match: Match; onScoreChange?: () =
           )}
           {!isLive && !isDone && !isLocked && !hasPick && (
             <span className="font-mono text-[9px] text-ink-3 whitespace-nowrap">
-              {match.date.split(' ').slice(1).join(' ')} · {match.time}
+              {match.date.split(' ').slice(1).join(' ')} · {match.time} BRT
             </span>
           )}
         </div>
@@ -242,7 +242,8 @@ function MatchRow({ match, onScoreChange }: { match: Match; onScoreChange?: () =
               <p className="font-mono text-[9px] tracking-eyebrow text-ink-3 mb-1 text-center">
                 PALPITE · PLACAR EXATO
               </p>
-              <p className="font-mono text-[8px] text-ink-4 mb-4 text-center">{match.venue}</p>
+              <p className="font-mono text-[8px] text-ink-4 mb-1 text-center">{match.venue}</p>
+              <p className="font-mono text-[8px] text-ink-4 mb-4 text-center">{match.date} · {match.time} · Horário de Brasília</p>
               <div className="flex items-center justify-center gap-5">
                 <div className="flex flex-col items-center gap-2 min-w-0">
                   <Flag team={match.home} size={40} />

@@ -111,8 +111,9 @@ interface ChatState {
   destroy:     () => void
   addMessage:  (msg: ChatMessage) => void
   clearError:  () => void
-  setPinned:   (id: string | null) => Promise<void>
-  voteOnPoll:  (msgId: string, userId: string, optionId: string) => Promise<void>
+  setPinned:     (id: string | null) => Promise<void>
+  voteOnPoll:    (msgId: string, userId: string, optionId: string) => Promise<void>
+  deleteMessage: (id: string) => Promise<void>
 }
 
 export const useChatStore = create<ChatState>()((set, get) => ({
@@ -336,6 +337,23 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           return { ...m, poll: { ...m.poll, votes } }
         }),
       }))
+    }
+  },
+
+  // ── deleteMessage (admin + own) ───────────────────────────────────────────
+
+  deleteMessage: async (id) => {
+    // Optimistic remove
+    set(s => ({ messages: s.messages.filter(m => m.id !== id) }))
+    // If this was the pinned message, unpin it
+    if (get().pinnedId === id) set({ pinnedId: null })
+
+    if (isMockMode) return
+
+    const { error } = await supabase.from('chat_messages').delete().eq('id', id)
+    if (error) {
+      console.error('[Chat] Erro ao deletar mensagem:', error.message)
+      set(s => ({ lastError: 'Erro ao deletar mensagem.' }))
     }
   },
 }))

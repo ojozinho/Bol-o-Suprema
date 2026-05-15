@@ -72,13 +72,27 @@ const VENUE_UTC_OFFSET: Record<string, number> = {
   'SoFi Stadium': -7, "Levi's Stadium": -7, 'Lumen Field': -7, 'BC Place': -7,
 }
 
-// Converts local kick-off time to BRT (UTC-3).
-// BRT = local − utcOffset − 3
+// Converts local kick-off time to BRT (UTC-3, America/Sao_Paulo).
+// BRT = UTC - 3. local + |utcOffset| = UTC.
 function toBRT(time: string, venue: string): string {
+  const utcOffset = VENUE_UTC_OFFSET[venue] ?? -4  // e.g. -4 for EDT
+  const [h, m] = time.split(':').map(Number)
+  // UTC = local_h - utcOffset  (utcOffset is negative, so -(−4) = +4)
+  const utcH = h - utcOffset
+  // BRT = UTC - 3
+  const brtH = ((utcH - 3) % 24 + 24) % 24
+  return `${String(brtH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+// Returns ISO 8601 UTC timestamp for kick-off (for deadline/auto-close logic).
+function toKickoffUtc(date: string, time: string, venue: string): string {
   const utcOffset = VENUE_UTC_OFFSET[venue] ?? -4
   const [h, m] = time.split(':').map(Number)
-  const brtH = ((h - utcOffset - 3) % 24 + 24) % 24
-  return `${String(brtH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  const utcH = h - utcOffset  // convert local → UTC
+  // Build a valid date. If utcH >= 24 it rolls to the next day.
+  const base = new Date(`${date}T00:00:00Z`)
+  base.setUTCHours(utcH, m, 0, 0)
+  return base.toISOString()
 }
 
 // ─── Raw match schedule — all 72 group stage matches ─────────────────────────
@@ -208,11 +222,24 @@ export function resolveMatch(r: RawMatch): Match {
     awayScore: r.awayScore ?? null,
     date: fmtMatchDate(r.date),
     time: toBRT(r.time, r.venue),
+    kickoffUtc: toKickoffUtc(r.date, r.time, r.venue),
     venue: `${r.venue} · ${r.city}`,
     status: r.status,
     liveMinute: r.liveMinute,
     winner: r.winner as Match['winner'],
   }
+}
+
+// Helper: returns true if bets are still open for this match
+// (kickoff is in the future — bets close at kickoff time)
+export function isBettingOpen(match: Match): boolean {
+  if (match.status !== 'open' && match.status !== 'scheduled') return false
+  return new Date(match.kickoffUtc) > new Date()
+}
+
+// Helper: formats the BRT time as a display string with timezone label
+export function fmtKickoffBRT(match: Match): string {
+  return `${match.time} (Horário de Brasília)`
 }
 
 // ─── Resolved exports ─────────────────────────────────────────────────────────

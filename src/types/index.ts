@@ -66,8 +66,9 @@ export interface Match {
   away: Team
   homeScore: number | null
   awayScore: number | null
-  date: string // e.g. "QUI 11 JUN"
-  time: string // e.g. "15:00"
+  date: string    // e.g. "QUI 11 JUN" — formatted in pt-BR
+  time: string    // e.g. "17:00" — BRT (America/Sao_Paulo, UTC-3)
+  kickoffUtc: string  // ISO 8601 UTC for deadline and auto-close logic
   venue: string
   status: MatchStatus
   liveMinute?: string // e.g. "68'"

@@ -241,7 +241,7 @@ export const useAuthStore = create<AuthState>()(
         })
 
         if (!isMockMode) {
-          await supabase.from('users').upsert({
+          const { error } = await supabase.from('users').upsert({
             id: current.id,
             email: current.email,
             first_name: updated.firstName,
@@ -257,6 +257,10 @@ export const useAuthStore = create<AuthState>()(
             favorite_player_img: updated.favoritePlayerImg ?? null,
             since:               updated.since,
           })
+          if (error) {
+            console.error('[Profile] Erro ao salvar perfil:', error.message)
+            throw new Error(error.message)
+          }
         }
       },
     }),

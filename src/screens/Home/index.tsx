@@ -486,7 +486,7 @@ function RotatingHero({ days, children }: { days: number; children?: React.React
         </div>
         <div className="font-display text-[80px] leading-none text-paper drop-shadow-lg">{days}</div>
         <div className="font-display text-2xl text-paper/70 -mt-1">DIAS</div>
-        <div className="font-serif-it text-sm text-yellow mt-1">para a bola rolar · 11 Jun · 17:00</div>
+        <div className="font-serif-it text-sm text-yellow mt-1">para a bola rolar · 11 Jun · 17:00 BRT</div>
       </div>
 
       {children}
@@ -616,7 +616,7 @@ function RotatingHeroDesktop({ days, onCta }: { days: number; onCta: () => void 
           </div>
           <div className="pb-2">
             <div className="font-serif-it text-xl text-yellow">para a bola rolar</div>
-            <div className="font-mono text-[11px] text-paper/50 mt-1">Fase de grupos · 11 Jun · 17:00</div>
+            <div className="font-mono text-[11px] text-paper/50 mt-1">11 Jun · 17:00 · Horário de Brasília</div>
           </div>
         </div>
         <button onClick={onCta} className="btn-yellow w-fit">FAZER PALPITES AGORA →</button>

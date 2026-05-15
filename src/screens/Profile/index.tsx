@@ -204,6 +204,7 @@ function useProfileForm() {
   const [favoritePlayer, setFavoritePlayer]     = useState(user?.favoritePlayer ?? '')
   const [favoritePlayerImg, setFavoritePlayerImg] = useState<string | undefined>(user?.favoritePlayerImg)
   const [saving, setSaving]                     = useState(false)
+  const [saveError, setSaveError]               = useState<string | null>(null)
   const [stats, setStats]                       = useState<UserStats>({ pts: 0, correct: 0, exact: 0, rank: null })
 
   useEffect(() => {
@@ -241,13 +242,19 @@ function useProfileForm() {
 
   const handleSave = async () => {
     setSaving(true)
-    await updateProfile(
-      { firstName, lastName, dept, bio, color: avatarColor, initials, favoriteTeam, favoritePlayer, favoritePlayerImg },
-      photoFile ?? undefined,
-      bannerFile ?? undefined,
-    )
-    setSaving(false)
-    navigate('/home')
+    setSaveError(null)
+    try {
+      await updateProfile(
+        { firstName, lastName, dept, bio, color: avatarColor, initials, favoriteTeam, favoritePlayer, favoritePlayerImg },
+        photoFile ?? undefined,
+        bannerFile ?? undefined,
+      )
+      navigate('/home')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Erro ao salvar perfil.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleSignOut = async () => { await signOut(); navigate('/login') }
@@ -262,6 +269,7 @@ function useProfileForm() {
     favoritePlayer, setFavoritePlayer, favoritePlayerImg, setFavoritePlayerImg,
     photoPreview, bannerPreview,
     photoRef, bannerRef,
+    saveError,
     handlePickPhoto, handlePickBanner,
     initials, saving,
     handleSave, handleSignOut, handleClearPredictions,
@@ -390,6 +398,11 @@ function ProfileMobile() {
           onEdit={() => navigate('/prediction', { state: { tab: 'champion' } })}
         />
 
+        {f.saveError && (
+          <div className="border border-red/40 bg-red/5 px-3 py-2 font-mono text-[10px] text-red">
+            ✕ {f.saveError}
+          </div>
+        )}
         <button onClick={f.handleSave} disabled={f.saving} className="btn-yellow w-full justify-center">
           {f.saving ? 'SALVANDO…' : 'SALVAR PERFIL →'}
         </button>
@@ -534,6 +547,11 @@ function ProfileDesktop() {
                 onEdit={() => navigate('/prediction', { state: { tab: 'champion' } })}
               />
 
+              {f.saveError && (
+                <div className="border border-red/40 bg-red/5 px-3 py-2 font-mono text-[10px] text-red">
+                  ✕ {f.saveError}
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button onClick={f.handleSave} disabled={f.saving}
                   className="btn-yellow flex-1 justify-center text-base">
