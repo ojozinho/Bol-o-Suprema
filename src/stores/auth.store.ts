@@ -5,11 +5,16 @@ import { supabase, isMockMode, uploadFile } from '@/lib/supabase'
 import { MOCK_ME } from '@/data/mock'
 import { getInitials } from '@/lib/utils'
 import { usePredictionStore } from './prediction.store'
+import { useBracketStore } from './bracket.store'
 
-function syncPredictions(userId: string) {
-  const store = usePredictionStore.getState()
-  store.setUserId(userId)
-  store.syncFromSupabase(userId)
+function syncUserStores(userId: string) {
+  const preds = usePredictionStore.getState()
+  preds.setUserId(userId)
+  preds.syncFromSupabase(userId)
+
+  const bracket = useBracketStore.getState()
+  bracket.setUserId(userId)
+  bracket.syncFromSupabase(userId)
 }
 
 // ─── DB row → AppUser ─────────────────────────────────────────────────────────
@@ -109,7 +114,7 @@ export const useAuthStore = create<AuthState>()(
       verifyOtp: async (email, token) => {
         if (isMockMode) {
           set({ user: MOCK_ME, isAuthenticated: true, profileComplete: true, isLoading: false })
-          syncPredictions(MOCK_ME.id)
+          syncUserStores(MOCK_ME.id)
           return {}
         }
 
@@ -138,7 +143,7 @@ export const useAuthStore = create<AuthState>()(
             profileComplete: !!(user.firstName && user.dept),
             isLoading: false,
           })
-          syncPredictions(user.id)
+          syncUserStores(user.id)
         } else {
           const stub: AppUser = {
             id: data.user.id,
@@ -162,6 +167,7 @@ export const useAuthStore = create<AuthState>()(
         if (!isMockMode) await supabase.auth.signOut()
         usePredictionStore.getState().clearAllPredictions()
         usePredictionStore.getState().setUserId(undefined)
+        useBracketStore.getState().setUserId(undefined)
         set({ user: null, isAuthenticated: false, profileComplete: false })
       },
 
@@ -200,7 +206,7 @@ export const useAuthStore = create<AuthState>()(
             profileComplete: !!(user?.firstName && user?.dept),
             isLoading: false,
           })
-          if (user?.id) syncPredictions(user.id)
+          if (user?.id) syncUserStores(user.id)
         } else {
           set({ user: null, isAuthenticated: false, isLoading: false })
         }

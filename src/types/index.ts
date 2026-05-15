@@ -17,7 +17,6 @@ export interface AppUser {
   email: string
   firstName: string
   lastName: string
-  nickname?: string
   dept: string
   initials: string
   color: string
@@ -36,11 +35,26 @@ export interface AppUser {
 // ─── Match ───────────────────────────────────────────────────────────────────
 
 export type MatchStatus = 'scheduled' | 'open' | 'live' | 'finished' | 'locked'
+
+// Status de aposta derivado do match status (para UX)
+export type BettingStatus = 'not_open' | 'open' | 'closing_soon' | 'locked' | 'settled'
+
+// Override de status vindo do Supabase — sobrepõe os dados estáticos do wc2026.ts
+export interface MatchStatusOverride {
+  matchCode: string
+  status: MatchStatus
+  homeScore: number | null
+  awayScore: number | null
+  liveMinute?: string | null
+  winner?: string | null
+}
 export type MatchStage =
   | 'group'
+  | 'round_of_32'
   | 'round_of_16'
   | 'quarter_final'
   | 'semi_final'
+  | 'third_place'
   | 'final'
 
 export interface Match {
@@ -78,7 +92,7 @@ export interface PredictionWithMatch extends Prediction {
 
 // ─── Bracket ─────────────────────────────────────────────────────────────────
 
-export type BracketRound = 'r16' | 'qf' | 'sf' | 'third' | 'final'
+export type BracketRound = 'r32' | 'r16' | 'qf' | 'sf' | 'third' | 'final'
 
 export interface BracketSlot {
   slotId: string // e.g. "r16_m1", "qf_m1"

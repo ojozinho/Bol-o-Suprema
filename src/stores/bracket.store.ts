@@ -1,10 +1,24 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { BracketRound, TeamCode } from '@/types'
+import { supabase, isMockMode } from '@/lib/supabase'
+
+function roundFromSlotId(slotId: string): BracketRound {
+  if (slotId.startsWith('r32_')) return 'r32'
+  if (slotId.startsWith('r16_')) return 'r16'
+  if (slotId.startsWith('qf_')) return 'qf'
+  if (slotId.startsWith('sf_')) return 'sf'
+  if (slotId.startsWith('third_')) return 'third'
+  return 'final'
+}
 
 interface BracketState {
   picks: Record<string, TeamCode> // slotId → pickedWinner
   lockedRounds: BracketRound[]
+  _userId: string | undefined
+
+  setUserId: (id: string | undefined) => void
+  syncFromSupabase: (userId: string) => Promise<void>
 
   setPick: (slotId: string, winner: TeamCode) => void
   clearPick: (slotId: string) => void
@@ -58,16 +72,68 @@ export const useBracketStore = create<BracketState>()(
     (set, get) => ({
       picks: {},
       lockedRounds: [],
+      _userId: undefined,
 
-      setPick: (slotId, winner) =>
-        set((s) => ({ picks: { ...s.picks, [slotId]: winner } })),
+      setUserId: (id) => set({ _userId: id }),
 
-      clearPick: (slotId) =>
+      // ── Sync from Supabase on login ─────────────────────────────────────────
+
+      syncFromSupabase: async (userId) => {
+        if (isMockMode) return
+        const { data } = await supabase
+          .from('bracket_picks')
+          .select('slot_id, picked_winner')
+          .eq('user_id', userId)
+
+        if (!data?.length) return
+        const picks: Record<string, TeamCode> = {}
+        for (const row of data) {
+          if (row.slot_id && row.picked_winner) {
+            picks[row.slot_id] = row.picked_winner as TeamCode
+          }
+        }
+        set((s) => ({ picks: { ...s.picks, ...picks } }))
+      },
+
+      // ── Picks: local + Supabase upsert ──────────────────────────────────────
+
+      setPick: (slotId, winner) => {
+        set((s) => ({ picks: { ...s.picks, [slotId]: winner } }))
+
+        const userId = get()._userId
+        if (!isMockMode && userId) {
+          supabase.from('bracket_picks').upsert(
+            {
+              user_id:       userId,
+              slot_id:       slotId,
+              round:         roundFromSlotId(slotId),
+              picked_winner: winner,
+            },
+            { onConflict: 'user_id,slot_id' }
+          ).then(({ error }) => {
+            if (error) console.error('[Bracket] setPick error:', error.message)
+          })
+        }
+      },
+
+      clearPick: (slotId) => {
         set((s) => {
           const picks = { ...s.picks }
           delete picks[slotId]
           return { picks }
-        }),
+        })
+
+        const userId = get()._userId
+        if (!isMockMode && userId) {
+          supabase.from('bracket_picks')
+            .delete()
+            .eq('user_id', userId)
+            .eq('slot_id', slotId)
+            .then(({ error }) => {
+              if (error) console.error('[Bracket] clearPick error:', error.message)
+            })
+        }
+      },
 
       lockRound: (round) =>
         set((s) => ({
@@ -84,7 +150,6 @@ export const useBracketStore = create<BracketState>()(
 
         const getSlot = (id: string) => allSlots.find((s) => s.slotId === id)
 
-        // For a QF slot, find the two R16 picks that feed it
         if (slotId.startsWith('qf_')) {
           const position = parseInt(slotId.replace('qf_', ''))
           const r16Home = Object.entries(R16_TO_QF)
@@ -124,7 +189,6 @@ export const useBracketStore = create<BracketState>()(
         }
 
         if (slotId === 'third_1') {
-          // losers side: sf_2 (left-bottom) vs sf_4 (right-bottom)
           const sf2 = getSlot('sf_2')
           const sf4 = getSlot('sf_4')
           const home = (sf2?.winner || picks['sf_2']) ?? null
@@ -133,7 +197,6 @@ export const useBracketStore = create<BracketState>()(
         }
 
         if (slotId === 'final_1') {
-          // sf_1 (left-top) vs sf_3 (right-top) — one from each half of the bracket
           const sf1 = getSlot('sf_1')
           const sf3 = getSlot('sf_3')
           const home = (sf1?.winner || picks['sf_1']) ?? null

@@ -52,7 +52,7 @@ end $$;
 create table if not exists public.matches (
   id          uuid primary key default uuid_generate_v4(),
   match_code  text unique,     -- e.g. 'g-a-1'  (matches wc2026.ts IDs)
-  stage       text not null check (stage in ('group','round_of_16','quarter_final','semi_final','final')),
+  stage       text not null check (stage in ('group','round_of_32','round_of_16','quarter_final','semi_final','third_place','final')),
   stage_label text not null,   -- e.g. 'GRUPO A · MD1'
   group_code  text,            -- 'A'…'L' for group stage
   matchday    int,             -- 1, 2 or 3 for group stage
@@ -105,7 +105,7 @@ create table if not exists public.bracket_picks (
   id            uuid primary key default uuid_generate_v4(),
   user_id       uuid not null references public.users(id) on delete cascade,
   slot_id       text not null,
-  round         text not null check (round in ('r16','qf','sf','final')),
+  round         text not null check (round in ('r32','r16','qf','sf','third','final')),
   picked_winner text not null,
   locked_at     timestamptz,
   is_correct    boolean,
@@ -147,6 +147,7 @@ create table if not exists public.poll_votes (
   user_id    uuid not null references public.users(id) on delete cascade,
   option_id  text not null,
   created_at timestamptz not null default now(),
+  voted_at   timestamptz,
   primary key (message_id, user_id)
 );
 

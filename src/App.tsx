@@ -3,6 +3,7 @@ import { createHashRouter, RouterProvider, Navigate, Outlet, useLocation, useNav
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuthStore } from '@/stores/auth.store'
 import { useChatStore } from '@/stores/chat.store'
+import { useMatchStore } from '@/stores/match.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { MobileNav } from '@/components/navigation/MobileNav'
 import { DesktopNav } from '@/components/navigation/DesktopNav'
@@ -81,13 +82,19 @@ function AppLayout() {
   const user = useAuthStore(s => s.user)
   const initChat = useChatStore(s => s.init)
   const destroyChat = useChatStore(s => s.destroy)
+  const initMatches = useMatchStore(s => s.init)
+  const destroyMatches = useMatchStore(s => s.destroy)
 
   useEffect(() => {
     if (user?.id) {
       initChat(user.id)
-      return () => { destroyChat() }
+      initMatches()
+      return () => {
+        destroyChat()
+        destroyMatches()
+      }
     }
-  }, [user?.id, initChat, destroyChat])
+  }, [user?.id, initChat, destroyChat, initMatches, destroyMatches])
 
   return (
     <div className="min-h-dvh flex flex-col">

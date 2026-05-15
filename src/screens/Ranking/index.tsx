@@ -3,57 +3,9 @@ import { Avatar } from '@/components/shared/Avatar'
 import { Eyebrow } from '@/components/shared/Eyebrow'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { useAuthStore } from '@/stores/auth.store'
-import { supabase, isMockMode } from '@/lib/supabase'
-import { MOCK_RANKING } from '@/data/mock'
 import { fmtPts, cn } from '@/lib/utils'
+import { fetchRanking } from '@/lib/ranking'
 import type { RankingEntry, Mov } from '@/types'
-
-// ─── Fetch ranking from Supabase ─────────────────────────────────────────────
-
-async function fetchRanking(myUserId?: string): Promise<RankingEntry[]> {
-  if (isMockMode) return MOCK_RANKING
-
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, first_name, last_name, dept, initials, color, avatar_url')
-    .order('created_at', { ascending: true })
-
-  if (!users?.length) return []
-
-  // Sum points_earned per user from predictions
-  const { data: pts } = await supabase
-    .from('predictions')
-    .select('user_id, points_earned')
-
-  const pointsMap: Record<string, number> = {}
-  const correctMap: Record<string, number> = {}
-  const exactMap:   Record<string, number> = {}
-
-  for (const row of pts ?? []) {
-    if (!row.user_id) continue
-    const p = row.points_earned ?? 0
-    pointsMap[row.user_id] = (pointsMap[row.user_id] ?? 0) + p
-    if (p >= 3) correctMap[row.user_id] = (correctMap[row.user_id] ?? 0) + 1
-    if (p >= 10) exactMap[row.user_id]  = (exactMap[row.user_id]   ?? 0) + 1
-  }
-
-  return users
-    .map(u => ({
-      userId:   u.id,
-      name:     `${u.first_name} ${u.last_name}`.trim(),
-      dept:     u.dept ?? '',
-      initials: u.initials ?? '?',
-      color:    u.color ?? '#777',
-      pts:      pointsMap[u.id] ?? 0,
-      correct:  correctMap[u.id] ?? 0,
-      exact:    exactMap[u.id]   ?? 0,
-      streak:   0,
-      mov:      '—' as Mov,
-      isYou:    u.id === myUserId,
-    }))
-    .sort((a, b) => b.pts - a.pts)
-    .map((u, i) => ({ ...u, rank: i + 1 }))
-}
 
 const MOV_COLOR = (mov: string) =>
   mov.startsWith('+') ? 'text-green' : mov.startsWith('-') ? 'text-red' : 'text-ink-4'
@@ -206,8 +158,8 @@ function RankingMobile() {
           <div className="space-y-2">
             {[
               { pts: '10', label: 'Placar exato' },
-              { pts: '7',  label: 'Resultado + diferença de gols' },
-              { pts: '3',  label: 'Só o vencedor' },
+              { pts: '7',  label: 'Resultado + gols de 1 time' },
+              { pts: '5',  label: 'Só o vencedor' },
               { pts: '25', label: 'Campeão (aposta geral)' },
               { pts: '15', label: 'Vice-campeão' },
               { pts: '10', label: 'Artilheiro' },
@@ -371,8 +323,8 @@ function RankingDesktop() {
               <div className="space-y-2">
                 {[
                   { pts: '10', label: 'Placar exato' },
-                  { pts: '7',  label: 'Resultado + diferença de gols' },
-                  { pts: '3',  label: 'Só o vencedor' },
+                  { pts: '7',  label: 'Resultado + gols de 1 time' },
+                  { pts: '5',  label: 'Só o vencedor' },
                   { pts: '25', label: 'Campeão (aposta geral)' },
                   { pts: '15', label: 'Vice-campeão' },
                   { pts: '10', label: 'Artilheiro' },

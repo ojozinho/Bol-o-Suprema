@@ -8,6 +8,7 @@ import { WC2026_MATCHES, WC2026_GROUPS } from '@/data/wc2026'
 import { TEAMS } from '@/data/teams'
 import { clamp, cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
+import { useMatchesWithStatus } from '@/hooks/useMatchWithStatus'
 import type { Match } from '@/types'
 
 type PredTab = 'groups' | 'knockout' | 'champion'
@@ -30,7 +31,8 @@ interface StandingRow {
 
 function computeStandings(
   groupCode: string,
-  predictions: Record<string, { homeScore: number; awayScore: number }>
+  predictions: Record<string, { homeScore: number; awayScore: number }>,
+  allMatches: Match[]
 ): StandingRow[] {
   const groupDef = WC2026_GROUPS.find(g => g.id === groupCode)
   if (!groupDef) return []
@@ -40,7 +42,7 @@ function computeStandings(
     rows[code] = { code, pts: 0, gf: 0, ga: 0, gd: 0, w: 0, d: 0, l: 0, mp: 0 }
   }
 
-  const matches = WC2026_MATCHES.filter(m => m.group === groupCode)
+  const matches = allMatches.filter(m => m.group === groupCode)
 
   for (const m of matches) {
     const pred = predictions[m.id]
@@ -88,9 +90,10 @@ function computeStandings(
 
 function computeGroupTop2(
   groupCode: string,
-  predictions: Record<string, { homeScore: number; awayScore: number }>
+  predictions: Record<string, { homeScore: number; awayScore: number }>,
+  allMatches: Match[]
 ): [string | null, string | null] {
-  const sorted = computeStandings(groupCode, predictions)
+  const sorted = computeStandings(groupCode, predictions, allMatches)
   return [sorted[0]?.code ?? null, sorted[1]?.code ?? null]
 }
 
@@ -362,18 +365,19 @@ function GroupsTab() {
   const [selectedGroup, setSelectedGroup] = useState<string>('A')
   const { predictions } = usePredictionStore()
   const [tick, setTick] = useState(0)
+  const allMatches = useMatchesWithStatus(WC2026_MATCHES)
 
   const countPerGroup = useMemo(() => {
     const map: Record<string, number> = {}
     for (const g of GROUP_LABELS) {
-      map[g] = WC2026_MATCHES.filter(m => m.group === g && predictions[m.id]).length
+      map[g] = allMatches.filter(m => m.group === g && predictions[m.id]).length
     }
     return map
-  }, [predictions, tick])
+  }, [allMatches, predictions, tick])
 
   const groupMatches = useMemo(
-    () => WC2026_MATCHES.filter(m => m.group === selectedGroup),
-    [selectedGroup]
+    () => allMatches.filter(m => m.group === selectedGroup),
+    [allMatches, selectedGroup]
   )
 
   const totalInGroup = groupMatches.length
@@ -395,8 +399,8 @@ function GroupsTab() {
     for (const [matchId, pred] of Object.entries(predictions)) {
       predMap[matchId] = { homeScore: pred.homeScore, awayScore: pred.awayScore }
     }
-    return computeStandings(selectedGroup, predMap)
-  }, [selectedGroup, predictions, tick])
+    return computeStandings(selectedGroup, predMap, allMatches)
+  }, [selectedGroup, predictions, allMatches, tick])
 
   const filledMatches = groupMatches.filter(m => {
     if (m.status === 'finished' || m.status === 'live') return true
@@ -404,6 +408,8 @@ function GroupsTab() {
   }).length
 
   const handleScoreChange = useCallback(() => setTick(t => t + 1), [])
+
+  const openMatchCount = groupMatches.filter(m => m.status === 'open' || m.status === 'scheduled').length
 
   return (
     <div className="pb-24">
@@ -583,14 +589,15 @@ interface KoTeams { home: string | null; away: string | null }
 
 function resolveKoTeams(
   groupPredMap: Record<string, { homeScore: number; awayScore: number }>,
-  koPredictions: Record<string, { homeScore: number; awayScore: number }>
+  koPredictions: Record<string, { homeScore: number; awayScore: number }>,
+  allMatches: Match[]
 ): Record<string, KoTeams> {
   const result: Record<string, KoTeams> = {}
 
   // Group top2 for all groups
   const groupTop2: Record<string, [string | null, string | null]> = {}
   for (const g of GROUP_LABELS) {
-    groupTop2[g] = computeGroupTop2(g, groupPredMap)
+    groupTop2[g] = computeGroupTop2(g, groupPredMap, allMatches)
   }
 
   // R32: from group standings
@@ -794,11 +801,11 @@ function KoMatchRow({
 function KnockoutTab() {
   const [activeRound, setActiveRound] = useState<KoRound>('r32')
   const { predictions } = usePredictionStore()
+  const allMatches = useMatchesWithStatus(WC2026_MATCHES)
 
   const groupPredMap = useMemo(() => {
     const m: Record<string, { homeScore: number; awayScore: number }> = {}
     for (const [matchId, pred] of Object.entries(predictions)) {
-      // only group stage matches
       if (!matchId.startsWith('ko-')) {
         m[matchId] = { homeScore: pred.homeScore, awayScore: pred.awayScore }
       }
@@ -817,8 +824,8 @@ function KnockoutTab() {
   }, [predictions])
 
   const koTeams = useMemo(
-    () => resolveKoTeams(groupPredMap, koPredMap),
-    [groupPredMap, koPredMap]
+    () => resolveKoTeams(groupPredMap, koPredMap, allMatches),
+    [groupPredMap, koPredMap, allMatches]
   )
 
   const hasGroupPreds = Object.keys(groupPredMap).length > 0
@@ -1185,16 +1192,16 @@ function DesktopGroupView({
 }) {
   const [tick, setTick] = useState(0)
   const handleScoreChange = useCallback(() => setTick(t => t + 1), [])
+  const allMatches = useMatchesWithStatus(WC2026_MATCHES)
 
   const groupMatches = useMemo(
-    () => WC2026_MATCHES.filter(m => m.group === selectedGroup),
-    [selectedGroup]
+    () => allMatches.filter(m => m.group === selectedGroup),
+    [allMatches, selectedGroup]
   )
 
   const standings = useMemo(
-    () => computeStandings(selectedGroup, predictions),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedGroup, predictions, tick]
+    () => computeStandings(selectedGroup, predictions, allMatches),
+    [selectedGroup, predictions, allMatches, tick]
   )
 
   const filledMatches = groupMatches.filter(m => {
@@ -1203,8 +1210,8 @@ function DesktopGroupView({
   }).length
 
   const countPerGroup = useMemo(() => {
-    return WC2026_MATCHES.filter(m => m.group === selectedGroup && predictions[m.id]).length
-  }, [selectedGroup, predictions, tick])
+    return allMatches.filter(m => m.group === selectedGroup && predictions[m.id]).length
+  }, [allMatches, selectedGroup, predictions, tick])
 
   return (
     <div className="border-2 border-ink flex flex-col">
@@ -1221,7 +1228,7 @@ function DesktopGroupView({
       </div>
 
       {[1, 2, 3].map(md => {
-        const matches = WC2026_MATCHES.filter(
+        const matches = allMatches.filter(
           m => m.group === selectedGroup && m.stageLabel.endsWith(`MD${md}`)
         )
         if (!matches.length) return null
@@ -1304,12 +1311,13 @@ export function PredictionScreen() {
   const rawTab = (location.state as { tab?: string } | null)?.tab
   const initialTab: PredTab = rawTab === 'champion' ? 'champion' : rawTab === 'knockout' ? 'knockout' : 'groups'
   const [tab, setTab] = useState<PredTab>(initialTab)
+  const allMatches = useMatchesWithStatus(WC2026_MATCHES)
 
   const initialGroup = useMemo(() => {
     if (!matchId) return 'A'
-    const m = WC2026_MATCHES.find(m => m.id === matchId)
+    const m = allMatches.find(m => m.id === matchId)
     return m?.group ?? 'A'
-  }, [matchId])
+  }, [matchId, allMatches])
 
   const [selectedGroup, setSelectedGroup] = useState(initialGroup)
   const { predictions } = usePredictionStore()
@@ -1317,8 +1325,8 @@ export function PredictionScreen() {
 
   const predMap = useMemo(() => {
     const m: Record<string, { homeScore: number; awayScore: number }> = {}
-    for (const [matchId, pred] of Object.entries(predictions)) {
-      m[matchId] = { homeScore: pred.homeScore, awayScore: pred.awayScore }
+    for (const [mId, pred] of Object.entries(predictions)) {
+      m[mId] = { homeScore: pred.homeScore, awayScore: pred.awayScore }
     }
     return m
   }, [predictions])
@@ -1326,13 +1334,13 @@ export function PredictionScreen() {
   const countPerGroup = useMemo(() => {
     const map: Record<string, number> = {}
     for (const g of GROUP_LABELS) {
-      map[g] = WC2026_MATCHES.filter(m => m.group === g && predictions[m.id]).length
+      map[g] = allMatches.filter(m => m.group === g && predictions[m.id]).length
     }
     return map
-  }, [predictions])
+  }, [allMatches, predictions])
 
   const totalDone = Object.values(predictions).filter(p => !p.matchId?.startsWith('ko-')).length
-  const totalMatches = WC2026_MATCHES.length
+  const totalMatches = allMatches.length
 
   const tabs = [
     { id: 'groups'   as const, label: 'GRUPOS'        },

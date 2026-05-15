@@ -7,14 +7,16 @@ import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { useAuthStore } from '@/stores/auth.store'
 import { usePredictionStore } from '@/stores/prediction.store'
 import { useChatStore } from '@/stores/chat.store'
-import { MOCK_UPCOMING, MOCK_RANKING } from '@/data/mock'
+import { useMatchStore } from '@/stores/match.store'
 import { WC2026_MATCHES } from '@/data/wc2026'
 import { TEAMS } from '@/data/teams'
 import { fmtPts, cn } from '@/lib/utils'
+import { fetchRanking } from '@/lib/ranking'
 import { fetchFeaturedVideos } from '@/lib/scorebat'
 import type { ScorebatVideo } from '@/lib/scorebat'
 import { fetchWC26News, isConfigured as newsConfigured } from '@/lib/footballnews'
 import type { FootballNewsItem } from '@/lib/footballnews'
+import type { RankingEntry, Match } from '@/types'
 
 // ─── Rotating hero background ─────────────────────────────────────────────────
 
@@ -466,6 +468,31 @@ function daysUntil(target: Date): number {
   return Math.max(0, Math.ceil((target.getTime() - now.getTime()) / 86_400_000))
 }
 
+// ─── Shared data hook ────────────────────────────────────────────────────────
+
+function useHomeData() {
+  const me = useAuthStore(s => s.user)
+  const { overrides, isLoaded } = useMatchStore()
+  const [ranking, setRanking] = useState<RankingEntry[]>([])
+
+  useEffect(() => {
+    fetchRanking(me?.id).then(setRanking)
+  }, [me?.id])
+
+  // Upcoming = first 6 open or scheduled matches (not finished/live/locked)
+  const upcoming = isLoaded
+    ? WC2026_MATCHES
+        .map((m): Match => {
+          const ov = overrides[m.id]
+          return ov ? { ...m, status: ov.status, homeScore: ov.homeScore, awayScore: ov.awayScore } : m
+        })
+        .filter(m => m.status === 'scheduled' || m.status === 'open')
+        .slice(0, 8)
+    : WC2026_MATCHES.filter(m => m.status === 'scheduled').slice(0, 8)
+
+  return { ranking, upcoming }
+}
+
 export function HomeScreen() {
   const isDesktop = useIsDesktop()
   return isDesktop ? <HomeDesktop /> : <HomeMobile />
@@ -583,14 +610,14 @@ function HomeMobile() {
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
   const { predictions, championPick, vicePick, scorerPick } = usePredictionStore()
-  const upcoming = MOCK_UPCOMING
+  const { ranking, upcoming } = useHomeData()
   const days = daysUntil(TOURNAMENT_START)
 
   const totalMatches = WC2026_MATCHES.length
   const totalPredictions = Object.keys(predictions).length
   const apostasFeitas = [championPick, vicePick, scorerPick].filter(Boolean).length
-  const top3 = MOCK_RANKING.slice(0, 3)
-  const myRank = MOCK_RANKING.find(r => r.isYou)
+  const top3 = ranking.slice(0, 3)
+  const myRank = ranking.find(r => r.isYou)
 
   return (
     <div className="min-h-dvh bg-paper pb-24">
@@ -734,14 +761,14 @@ function HomeDesktop() {
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
   const { predictions, championPick, vicePick, scorerPick } = usePredictionStore()
-  const upcoming = MOCK_UPCOMING
+  const { ranking, upcoming } = useHomeData()
   const days = daysUntil(TOURNAMENT_START)
 
   const totalMatches = WC2026_MATCHES.length
   const totalPredictions = Object.keys(predictions).length
   const apostasFeitas = [championPick, vicePick, scorerPick].filter(Boolean).length
-  const top5 = MOCK_RANKING.slice(0, 5)
-  const myRank = MOCK_RANKING.find(r => r.isYou)
+  const top5 = ranking.slice(0, 5)
+  const myRank = ranking.find(r => r.isYou)
 
   return (
     <div className="min-h-dvh bg-paper">
