@@ -26,7 +26,11 @@ interface UserRow {
   favorite_team?: string | null; favorite_player?: string | null
   favorite_player_img?: string | null
   champion_pick?: string | null; vice_pick?: string | null; scorer_pick?: string | null
-  since: string; is_admin: boolean; is_marketing: boolean; created_at: string
+  since: string; is_admin: boolean; is_marketing: boolean; is_owner?: boolean
+  user_role?: 'user' | 'marketing' | 'admin' | 'owner'
+  participant_status?: 'pending' | 'active' | 'blocked' | 'removed'
+  privacy_hide_email?: boolean; privacy_hide_profile?: boolean
+  created_at: string
 }
 
 function mapUser(row: UserRow): AppUser {
@@ -47,6 +51,11 @@ function mapUser(row: UserRow): AppUser {
     since:             row.since ?? String(new Date().getFullYear()),
     isAdmin:           row.is_admin    ?? false,
     isMarketing:       row.is_marketing ?? false,
+    isOwner:           row.is_owner ?? false,
+    userRole:          row.user_role ?? (row.is_admin ? 'admin' : row.is_marketing ? 'marketing' : 'user'),
+    participantStatus: row.participant_status ?? 'active',
+    privacyHideEmail:  row.privacy_hide_email ?? true,
+    privacyHideProfile: row.privacy_hide_profile ?? false,
     createdAt:         row.created_at  ?? new Date().toISOString(),
   }
 }
@@ -156,6 +165,11 @@ export const useAuthStore = create<AuthState>()(
             since: String(new Date().getFullYear()),
             isAdmin: false,
             isMarketing: false,
+            isOwner: false,
+            userRole: 'user',
+            participantStatus: 'pending',
+            privacyHideEmail: true,
+            privacyHideProfile: false,
             createdAt: new Date().toISOString(),
           }
           set({ user: stub, isAuthenticated: true, profileComplete: false, isLoading: false })
@@ -255,6 +269,8 @@ export const useAuthStore = create<AuthState>()(
             favorite_team:       updated.favoriteTeam,
             favorite_player:     updated.favoritePlayer,
             favorite_player_img: updated.favoritePlayerImg ?? null,
+            privacy_hide_email:  updated.privacyHideEmail ?? true,
+            privacy_hide_profile: updated.privacyHideProfile ?? false,
             since:               updated.since,
           })
           if (error) {
