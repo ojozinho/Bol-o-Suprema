@@ -239,6 +239,17 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             }),
           }))
         })
+      // Deleted messages
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'chat_messages', filter: 'channel_id=eq.geral' },
+        (payload) => {
+          const id = (payload.old as { id: string }).id
+          set(s => {
+            const messages = s.messages.filter(m => m.id !== id)
+            const pinnedId = s.pinnedId === id ? null : s.pinnedId
+            return { messages, pinnedId }
+          })
+        })
       // Pin changes
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'channel_pins', filter: 'channel_id=eq.geral' },
