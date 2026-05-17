@@ -47,7 +47,8 @@ export async function uploadFile(
       .from(bucket)
       .upload(path, file, { upsert: true, contentType: file.type })
     if (!error) {
-      return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
+      const { publicUrl } = supabase.storage.from(bucket).getPublicUrl(path).data
+      return `${publicUrl}?v=${Date.now()}`
     }
     console.error(`[Storage] ${bucket}/${path}:`, error.message)
     lastError = error.message
