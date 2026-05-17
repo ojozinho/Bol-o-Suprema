@@ -48,6 +48,23 @@ do $$ begin
   end if;
 end $$;
 
+-- Migration: add governance columns if missing (existing DBs without migration 20260515143000)
+do $$ begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users' and column_name = 'is_owner'
+  ) then
+    alter table public.users
+      add column is_owner boolean not null default false,
+      add column user_role text not null default 'user'
+        check (user_role in ('user','marketing','admin','owner')),
+      add column participant_status text not null default 'active'
+        check (participant_status in ('pending','active','blocked','removed')),
+      add column privacy_hide_email boolean not null default true,
+      add column privacy_hide_profile boolean not null default false;
+  end if;
+end $$;
+
 -- ── Matches ───────────────────────────────────────────────────
 create table if not exists public.matches (
   id          uuid primary key default uuid_generate_v4(),

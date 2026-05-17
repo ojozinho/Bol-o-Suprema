@@ -108,8 +108,8 @@ export function UserProfileScreen() {
 
       <div className="max-w-screen-md mx-auto px-5 md:px-8">
 
-        {/* Avatar + name row */}
-        <div className="flex items-end justify-between -mt-10 md:-mt-12 mb-4">
+        {/* Avatar + name row — relative z-10 ensures it paints above the positioned banner */}
+        <div className="relative z-10 flex items-end justify-between -mt-10 md:-mt-12 mb-4">
           <div className="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden border-4 border-paper bg-paper flex-shrink-0">
             {profile.avatarUrl ? (
               <img src={profile.avatarUrl} alt={profile.firstName} className="w-full h-full object-cover" />

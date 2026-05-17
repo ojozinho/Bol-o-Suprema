@@ -215,7 +215,7 @@ function useProfileForm() {
       .eq('user_id', user.id)
       .order('snapshot_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data) setStats({ pts: data.pts, correct: data.correct, exact: data.exact_score, rank: data.rank })
       })

@@ -277,8 +277,6 @@ export const useAuthStore = create<AuthState>()(
             favorite_team:       updated.favoriteTeam,
             favorite_player:     updated.favoritePlayer,
             favorite_player_img: updated.favoritePlayerImg ?? null,
-            privacy_hide_email:  updated.privacyHideEmail ?? true,
-            privacy_hide_profile: updated.privacyHideProfile ?? false,
             since:               updated.since,
           })
           if (error) {

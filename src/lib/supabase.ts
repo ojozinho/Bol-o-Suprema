@@ -36,6 +36,9 @@ export async function uploadFile(
   const bucket = filename === 'banner' ? 'banners' : 'avatars'
   const path = `${userId}/${filename}.${ext}`
   const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true, contentType: file.type })
-  if (error) return null
+  if (error) {
+    console.error(`[Storage] Upload failed (${bucket}/${path}):`, error.message)
+    return null
+  }
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
 }
