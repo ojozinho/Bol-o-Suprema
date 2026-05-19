@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useChatStore } from '@/stores/chat.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { supabase, isMockMode, uploadChatMedia } from '@/lib/supabase'
+import { isSafeHttpUrl } from '@/lib/security'
 import type { ChatMessage, ChatPoll } from '@/types'
 
 // ─── GIF API ─────────────────────────────────────────────────────────────────
@@ -469,7 +470,7 @@ function GifBubble({ m, grouped, onOpenProfile }: { m: ChatMessage; grouped: boo
       <div className={cn('max-w-[60%] flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
         {!m.isYou && !grouped && <MsgHeader m={m} onOpen={() => onOpenProfile(m)} />}
         <div className={cn('overflow-hidden shadow-sm', m.isYou ? 'rounded-[16px_4px_16px_16px]' : 'rounded-[4px_16px_16px_16px]')}>
-          <img src={m.gifUrl} alt="GIF" className="max-w-full max-h-52 object-contain block" loading="lazy" />
+          {isSafeHttpUrl(m.gifUrl) && <img src={m.gifUrl} alt="GIF" className="max-w-full max-h-52 object-contain block" loading="lazy" />}
         </div>
         {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
       </div>
@@ -494,7 +495,7 @@ function ImageBubble({ m, grouped, onOpenProfile }: { m: ChatMessage; grouped: b
             onClick={() => setOpen(true)}
             className={cn('overflow-hidden shadow-sm hover:opacity-90 transition-opacity', m.isYou ? 'rounded-[16px_4px_16px_16px]' : 'rounded-[4px_16px_16px_16px]')}
           >
-            <img src={m.imageUrl} alt="Foto" className="max-w-full max-h-64 object-cover block" loading="lazy" />
+            {isSafeHttpUrl(m.imageUrl) && <img src={m.imageUrl} alt="Foto" className="max-w-full max-h-64 object-cover block" loading="lazy" />}
           </button>
           {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
         </div>
@@ -507,7 +508,7 @@ function ImageBubble({ m, grouped, onOpenProfile }: { m: ChatMessage; grouped: b
             className="fixed inset-0 z-50 bg-ink/90 flex items-center justify-center p-4"
             onClick={() => setOpen(false)}
           >
-            <img src={m.imageUrl} alt="Foto" className="max-w-full max-h-full object-contain" />
+            {isSafeHttpUrl(m.imageUrl) && <img src={m.imageUrl} alt="Foto" className="max-w-full max-h-full object-contain" />}
           </motion.div>
         )}
       </AnimatePresence>
