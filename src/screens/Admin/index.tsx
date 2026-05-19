@@ -420,14 +420,7 @@ function ParticipantsPanel({ onToast }: { onToast: (msg: string, ok: boolean) =>
     setBusy(true)
     const newStatus = p.participant_status === 'blocked' ? 'active' : 'blocked'
     const { error } = await supabase.rpc('update_participant_status', { p_user_id: p.id, p_status: newStatus })
-    if (error) {
-      // Fallback: direct update if RPC doesn't exist
-      const { error: directErr } = await supabase
-        .from('users')
-        .update({ participant_status: newStatus })
-        .eq('id', p.id)
-      if (directErr) { onToast(`Erro: ${directErr.message}`, false); setBusy(false); return }
-    }
+    if (error) { onToast(`Erro: ${error.message}`, false); setBusy(false); return }
     const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email
     onToast(`✓ ${name} → ${newStatus === 'blocked' ? 'BLOQUEADO' : 'DESBLOQUEADO'}`, true)
     await load()

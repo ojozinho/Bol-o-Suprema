@@ -1,8 +1,14 @@
 .DS_Store
 .claude/
-uploads/.DS_Store
 node_modules/
 dist/
-.env.local
+coverage/
+*.log
+
+# Environment — never commit real credentials
 .env
-*.local
+.env.*
+!.env.example
+
+# Uploads — user media should live in Supabase Storage, not in the repo
+uploads/
