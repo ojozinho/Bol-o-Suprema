@@ -1,0 +1,130 @@
+import { useState } from 'react'
+import { cn } from '@/lib/utils'
+import { Avatar } from '@/components/shared/Avatar'
+import type { ChatMessage } from '@/types'
+import { MessageContent } from './MessageContent'
+import { MessageMenu } from './MessageMenu'
+
+export interface MessageBubbleProps {
+  message: ChatMessage
+  grouped: boolean
+  isAdmin: boolean
+  isPinned: boolean
+  currentUserId?: string
+  onReply: () => void
+  onPin: () => void
+  onDeleteRequest: () => void
+  onVote: (optId: string) => void
+  onOpenProfile: () => void
+}
+
+export function MessageBubble({
+  message: m,
+  grouped,
+  isAdmin,
+  isPinned,
+  currentUserId,
+  onReply,
+  onPin,
+  onDeleteRequest,
+  onVote,
+  onOpenProfile,
+}: MessageBubbleProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const isMine   = m.isYou ?? false
+  const canDelete = isAdmin || isMine
+
+  return (
+    <div
+      className={cn('flex w-full px-3 py-0.5', isMine ? 'justify-end' : 'justify-start')}
+      onClick={() => menuOpen && setMenuOpen(false)}
+    >
+      {/* Avatar column — others only */}
+      {!isMine && (
+        <div className="mr-2 w-9 shrink-0 self-end mb-0.5">
+          {!grouped ? (
+            <button onClick={onOpenProfile} className="hover:opacity-80 transition-opacity">
+              <Avatar initials={m.initials} color={m.color} src={m.avatarUrl} size={32} />
+            </button>
+          ) : null}
+        </div>
+      )}
+
+      {/* Bubble wrapper — max width enforced here */}
+      <div className={cn(
+        'group/message relative min-w-0',
+        'max-w-[84%] sm:max-w-[78%] md:max-w-[560px]',
+      )}>
+        {/* Author name (above bubble for first in group) */}
+        {!isMine && !grouped && (
+          <button
+            onClick={onOpenProfile}
+            className="block font-mono text-[9px] font-bold text-ink hover:underline mb-1 ml-1 text-left leading-none truncate max-w-full"
+          >
+            {m.who}
+            {m.dept && <span className="font-normal text-ink-4"> · {m.dept}</span>}
+          </button>
+        )}
+
+        {/* Bubble shell */}
+        <div className={cn(
+          'relative break-words shadow-sm',
+          m.type === 'gif' || m.type === 'image'
+            ? 'overflow-hidden p-0'
+            : m.type === 'audio'
+              ? 'px-3.5 py-2.5'
+              : 'px-3.5 py-2.5',
+          isMine
+            ? 'rounded-2xl rounded-br-sm bg-yellow text-ink'
+            : 'rounded-2xl rounded-bl-sm border border-line bg-paper-deep text-ink',
+        )}>
+          {/* Media wrapper with padding for gif/image */}
+          {(m.type === 'gif' || m.type === 'image') && !m.replyTo ? (
+            <MessageContent message={m} isMine={isMine} userId={currentUserId} onVote={onVote} />
+          ) : (
+            <MessageContent message={m} isMine={isMine} userId={currentUserId} onVote={onVote} />
+          )}
+
+          {/* Timestamp */}
+          {m.type !== 'poll' && (
+            <div className={cn(
+              'font-mono text-[9px] text-right mt-1',
+              isMine ? 'text-ink/40' : 'text-ink-4',
+              (m.type === 'gif' || m.type === 'image') && 'px-2 pb-1',
+            )}>
+              {m.time}
+            </div>
+          )}
+
+          {/* Menu toggle button — hidden on desktop until hover */}
+          <button
+            type="button"
+            aria-label="Opções da mensagem"
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
+            className={cn(
+              'absolute right-1 top-1 z-20 flex h-6 w-6 items-center justify-center rounded-full',
+              'font-mono text-[11px] text-ink-4 transition-all',
+              'opacity-100 hover:bg-ink/10 md:opacity-0 md:group-hover/message:opacity-100 md:focus:opacity-100',
+              menuOpen && 'opacity-100 bg-ink/10',
+            )}
+          >
+            ⌄
+          </button>
+
+          {/* Dropdown menu — positioned inside bubble */}
+          {menuOpen && (
+            <MessageMenu
+              isMine={isMine}
+              isAdmin={isAdmin}
+              isPinned={isPinned}
+              canDelete={canDelete}
+              onReply={() => { onReply(); setMenuOpen(false) }}
+              onPin={() => { onPin(); setMenuOpen(false) }}
+              onDelete={() => { onDeleteRequest(); setMenuOpen(false) }}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
