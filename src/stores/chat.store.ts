@@ -152,15 +152,31 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
 
     // 1. Load last 200 messages (ordered asc for display)
-    const { data: rows, error: fetchError } = await supabase
+    const SELECT_WITH_REPLY = `
+      id, user_id, channel_id, text, type, gif_url, image_url, audio_url, audio_duration, poll_data, reaction, reply_to, created_at,
+      users!user_id ( id, first_name, last_name, dept, initials, color, avatar_url )
+    `
+    const SELECT_WITHOUT_REPLY = `
+      id, user_id, channel_id, text, type, gif_url, image_url, audio_url, audio_duration, poll_data, reaction, created_at,
+      users!user_id ( id, first_name, last_name, dept, initials, color, avatar_url )
+    `
+
+    let { data: rows, error: fetchError } = await supabase
       .from('chat_messages')
-      .select(`
-        id, user_id, channel_id, text, type, gif_url, image_url, audio_url, audio_duration, poll_data, reaction, reply_to, created_at,
-        users!user_id ( id, first_name, last_name, dept, initials, color, avatar_url )
-      `)
+      .select(SELECT_WITH_REPLY)
       .eq('channel_id', 'geral')
       .order('created_at', { ascending: true })
       .limit(200)
+
+    // Migration not applied yet — retry without reply_to so messages still load
+    if (fetchError?.message?.includes('reply_to')) {
+      ;({ data: rows, error: fetchError } = await supabase
+        .from('chat_messages')
+        .select(SELECT_WITHOUT_REPLY)
+        .eq('channel_id', 'geral')
+        .order('created_at', { ascending: true })
+        .limit(200))
+    }
 
     if (fetchError) console.error('[Chat] init fetch error:', fetchError.message)
 
