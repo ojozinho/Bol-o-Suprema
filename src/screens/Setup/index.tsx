@@ -6,7 +6,7 @@ import { Logo } from '@/components/shared/Logo'
 import { TeamSearchPicker } from '@/components/shared/TeamSearchPicker'
 import { useAuthStore } from '@/stores/auth.store'
 import { searchPlayers } from '@/lib/thesportsdb'
-import { AVATAR_COLORS, getInitials } from '@/lib/utils'
+import { getInitials } from '@/lib/utils'
 import type { PlayerResult } from '@/lib/thesportsdb'
 import type { TeamCode } from '@/types'
 
@@ -115,7 +115,7 @@ export function SetupScreen() {
   const [lastName, setLastName]                 = useState(user?.lastName ?? '')
   const [dept, setDept]                         = useState(user?.dept ?? '')
   const [bio, setBio]                           = useState(user?.bio ?? '')
-  const [avatarColor, setAvatarColor]           = useState(user?.color ?? AVATAR_COLORS[0])
+  const [avatarColor]                           = useState(user?.color ?? '#00A651')
   const [favoriteTeam, setFavoriteTeam]         = useState<TeamCode | undefined>(user?.favoriteTeam)
   const [favoritePlayer, setFavoritePlayer]     = useState(user?.favoritePlayer ?? '')
   const [favoritePlayerImg, setFavoritePlayerImg] = useState<string | undefined>(user?.favoritePlayerImg)
@@ -264,20 +264,12 @@ export function SetupScreen() {
                 SUA FOTO<br/>
                 <span className="text-green-deep">DE PERFIL</span>
               </h1>
-              <p className="font-serif-it text-ink-3 text-lg mb-6">
-                obrigatório — o pessoal precisa te reconhecer no chat
+              <p className="font-serif-it text-ink-3 text-lg mb-2">
+                o pessoal precisa te reconhecer no chat
               </p>
-
-              {/* Color dots */}
-              <div className="mb-6">
-                <label className="font-mono text-[9px] tracking-eyebrow text-ink-3 block mb-2">COR DO AVATAR</label>
-                <div className="flex gap-2 flex-wrap">
-                  {AVATAR_COLORS.map(c => (
-                    <button key={c} onClick={() => setAvatarColor(c)}
-                      className="w-8 h-8 rounded-full border-2 transition-transform hover:scale-110"
-                      style={{ background: c, borderColor: avatarColor === c ? '#0D0D0D' : 'transparent' }} />
-                  ))}
-                </div>
+              <div className="inline-flex items-center gap-2 border-2 border-red/40 bg-red/5 px-3 py-1.5 mb-6">
+                <span className="font-mono text-[9px] text-red font-bold tracking-eyebrow">OBRIGATÓRIO</span>
+                <span className="font-mono text-[9px] text-red/80">— sem foto não dá pra avançar</span>
               </div>
 
               {/* Big circular avatar tap target */}

@@ -10,7 +10,7 @@ import { usePredictionStore } from '@/stores/prediction.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { TEAMS } from '@/data/teams'
 import { TeamSearchPicker } from '@/components/shared/TeamSearchPicker'
-import { getInitials, fmtPts, AVATAR_COLORS } from '@/lib/utils'
+import { getInitials, fmtPts } from '@/lib/utils'
 import { searchPlayers } from '@/lib/thesportsdb'
 import { supabase, isMockMode } from '@/lib/supabase'
 import type { PlayerResult } from '@/lib/thesportsdb'
@@ -166,7 +166,7 @@ function useProfileForm() {
   const [lastName, setLastName]                 = useState(user?.lastName ?? '')
   const [dept, setDept]                         = useState(user?.dept ?? '')
   const [bio, setBio]                           = useState(user?.bio ?? '')
-  const [avatarColor, setAvatarColor]           = useState(user?.color ?? '#00A651')
+  const [avatarColor]                           = useState(user?.color ?? '#00A651')
   const [favoriteTeam, setFavoriteTeam]         = useState<TeamCode | undefined>(user?.favoriteTeam)
   const [favoritePlayer, setFavoritePlayer]     = useState(user?.favoritePlayer ?? '')
   const [favoritePlayerImg, setFavoritePlayerImg] = useState<string | undefined>(user?.favoritePlayerImg)
@@ -231,7 +231,7 @@ function useProfileForm() {
 
   return {
     user, firstName, setFirstName, lastName, setLastName,
-    dept, setDept, bio, setBio, avatarColor, setAvatarColor,
+    dept, setDept, bio, setBio, avatarColor,
     favoriteTeam, setFavoriteTeam,
     favoritePlayer, setFavoritePlayer, favoritePlayerImg, setFavoritePlayerImg,
     photoPreview, bannerPreview,
@@ -326,18 +326,6 @@ function ProfileMobile() {
       </div>
 
       <div className="px-5 pt-5 space-y-5">
-
-        {/* Color dots */}
-        <div>
-          <label className="font-mono text-[10px] tracking-eyebrow text-ink-3 block mb-2">COR DO AVATAR</label>
-          <div className="flex gap-2 flex-wrap">
-            {AVATAR_COLORS.map(c => (
-              <button key={c} onClick={() => f.setAvatarColor(c)}
-                className="w-8 h-8 rounded-full border-2 transition-transform hover:scale-110"
-                style={{ background: c, borderColor: f.avatarColor === c ? '#0D0D0D' : 'transparent' }} />
-            ))}
-          </div>
-        </div>
 
         <div>
           <label className="font-mono text-[10px] tracking-eyebrow text-ink-3 block mb-1.5">NOME</label>
@@ -480,20 +468,6 @@ function ProfileDesktop() {
 
             {/* Fields below banner — pt-14 for avatar */}
             <div className="pt-12 space-y-5">
-
-              <div>
-                <label className="font-mono text-[10px] tracking-eyebrow text-ink-3 block mb-2">COR DO AVATAR</label>
-                <div className="flex items-center gap-3">
-                  <Avatar initials={f.initials} color={f.avatarColor} size={44} />
-                  <div className="flex gap-2">
-                    {AVATAR_COLORS.map(c => (
-                      <button key={c} onClick={() => f.setAvatarColor(c)}
-                        className="w-8 h-8 rounded-full border-2 transition-transform hover:scale-110"
-                        style={{ background: c, borderColor: f.avatarColor === c ? '#0D0D0D' : '#ECE6D6' }} />
-                    ))}
-                  </div>
-                </div>
-              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
