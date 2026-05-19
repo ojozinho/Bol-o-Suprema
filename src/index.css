@@ -16,6 +16,13 @@
     @apply bg-paper text-ink font-sans;
     margin: 0;
     min-height: 100dvh;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  input, textarea, [contenteditable] {
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   #root {

@@ -2,18 +2,19 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Logo } from '@/components/shared/Logo'
 import { Avatar } from '@/components/shared/Avatar'
+import { Tooltip } from '@/components/shared/Tooltip'
 import { useAuthStore } from '@/stores/auth.store'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { id: 'home',       label: 'HOME',     path: '/home' },
-  { id: 'boletim',   label: 'BOLETIM',  path: '/boletim' },
-  { id: 'prediction',label: 'PALPITAR', path: '/prediction' },
-  { id: 'mine',      label: 'MEUS',     path: '/meus-palpites' },
-  { id: 'ranking',   label: 'RANKING',  path: '/ranking' },
-  { id: 'rules',     label: 'REGRAS',   path: '/regulamento' },
-  { id: 'alerts',    label: 'AVISOS',   path: '/notificacoes' },
-  { id: 'resenha',   label: 'RESENHA',  path: '/resenha' },
+  { id: 'home',       label: 'HOME',     path: '/home',           tip: 'Resumo do dia, boletim rápido e destaques do bolão' },
+  { id: 'boletim',   label: 'BOLETIM',  path: '/boletim',        tip: 'Resultados e placar ao vivo de todos os jogos da Copa' },
+  { id: 'prediction',label: 'PALPITAR', path: '/prediction',     tip: 'Faça seus palpites por grupo, mata-mata e apostas gerais' },
+  { id: 'mine',      label: 'MEUS',     path: '/meus-palpites',  tip: 'Histórico de todos os seus palpites com pontuação detalhada' },
+  { id: 'ranking',   label: 'RANKING',  path: '/ranking',        tip: 'Classificação geral — veja quem está na frente e a quantos pts você está' },
+  { id: 'rules',     label: 'REGRAS',   path: '/regulamento',    tip: 'Regulamento completo e tabela de pontos do bolão' },
+  { id: 'alerts',    label: 'AVISOS',   path: '/notificacoes',   tip: 'Comunicados e notificações importantes do admin' },
+  { id: 'resenha',   label: 'RESENHA',  path: '/resenha',        tip: 'Chat ao vivo com todos os participantes — resenha garantida' },
 ]
 
 export function DesktopNav() {
@@ -52,33 +53,36 @@ export function DesktopNav() {
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.path
             return (
-              <button
-                key={item.id}
-                onClick={() => navigate(item.path)}
-                className={cn(
-                  'px-3 py-1.5 font-mono text-[11px] font-bold tracking-eyebrow uppercase transition-all active:scale-95 active:opacity-70',
-                  active
-                    ? 'bg-ink text-paper'
-                    : 'text-ink-3 hover:text-ink hover:bg-hairline'
-                )}
-              >
-                {item.label}
-              </button>
+              <Tooltip key={item.id} content={item.tip} side="bottom">
+                <button
+                  onClick={() => navigate(item.path)}
+                  className={cn(
+                    'px-3 py-1.5 font-mono text-[11px] font-bold tracking-eyebrow uppercase transition-all active:scale-95 active:opacity-70',
+                    active
+                      ? 'bg-ink text-paper'
+                      : 'text-ink-3 hover:text-ink hover:bg-hairline'
+                  )}
+                >
+                  {item.label}
+                </button>
+              </Tooltip>
             )
           })}
         </nav>
 
         <div className="flex items-center gap-3 flex-shrink-0">
           {user?.isAdmin && (
-            <button
-              onClick={() => navigate('/admin')}
-              className={cn(
-                'px-3 py-1.5 font-mono text-[11px] font-bold tracking-eyebrow uppercase transition-colors rounded-sm',
-                pathname === '/admin' ? 'bg-red text-white' : 'text-red hover:bg-red/10'
-              )}
-            >
-              ADMIN
-            </button>
+            <Tooltip content="Painel de controle — gerenciar partidas, participantes e regras" side="bottom">
+              <button
+                onClick={() => navigate('/admin')}
+                className={cn(
+                  'px-3 py-1.5 font-mono text-[11px] font-bold tracking-eyebrow uppercase transition-colors rounded-sm',
+                  pathname === '/admin' ? 'bg-red text-white' : 'text-red hover:bg-red/10'
+                )}
+              >
+                ADMIN
+              </button>
+            </Tooltip>
           )}
 
           {user && (

@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Flag } from '@/components/shared/Flag'
+import { Tooltip } from '@/components/shared/Tooltip'
 import { usePredictionStore } from '@/stores/prediction.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { WC2026_MATCHES, WC2026_GROUPS } from '@/data/wc2026'
@@ -125,19 +126,33 @@ function ScoreInput({ value, onChange }: { value: number; onChange: (n: number) 
 function StatusChip({ match }: { match: Match }) {
   if (match.status === 'live') {
     return (
-      <span className="inline-flex items-center gap-1 font-mono text-[8px] font-bold tracking-eyebrow text-red">
-        <span className="w-1.5 h-1.5 rounded-full bg-red animate-pulse-live" />
-        {match.liveMinute ? `${match.liveMinute}'` : 'AO VIVO'}
-      </span>
+      <Tooltip content="Partida em andamento — palpites encerrados" side="top">
+        <span className="inline-flex items-center gap-1 font-mono text-[8px] font-bold tracking-eyebrow text-red cursor-default">
+          <span className="w-1.5 h-1.5 rounded-full bg-red animate-pulse-live" />
+          {match.liveMinute ? `${match.liveMinute}'` : 'AO VIVO'}
+        </span>
+      </Tooltip>
     )
   }
   if (match.status === 'finished') {
-    return <span className="font-mono text-[8px] tracking-eyebrow text-ink-4">ENCERRADO</span>
+    return (
+      <Tooltip content="Partida encerrada — resultado oficial registrado e pontos calculados" side="top">
+        <span className="font-mono text-[8px] tracking-eyebrow text-ink-4 cursor-default">ENCERRADO</span>
+      </Tooltip>
+    )
   }
   if (match.status === 'locked') {
-    return <span className="font-mono text-[8px] tracking-eyebrow text-ink-4">■ BLOQUEADO</span>
+    return (
+      <Tooltip content="Prazo encerrado — apostas não são mais aceitas para esta partida" side="top">
+        <span className="font-mono text-[8px] tracking-eyebrow text-ink-4 cursor-default">■ BLOQUEADO</span>
+      </Tooltip>
+    )
   }
-  return <span className="font-mono text-[8px] tracking-eyebrow text-green font-bold">ABERTO</span>
+  return (
+    <Tooltip content="Apostas abertas! Clique na partida para registrar seu palpite antes do prazo" side="top">
+      <span className="font-mono text-[8px] tracking-eyebrow text-green font-bold cursor-default">ABERTO</span>
+    </Tooltip>
+  )
 }
 
 // ─── Match row ────────────────────────────────────────────────────────────────

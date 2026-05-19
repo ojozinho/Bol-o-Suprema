@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/shared/Avatar'
 import { Eyebrow } from '@/components/shared/Eyebrow'
+import { Tooltip } from '@/components/shared/Tooltip'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { useAuthStore } from '@/stores/auth.store'
 import { fmtPts, cn } from '@/lib/utils'
@@ -77,9 +78,15 @@ function RankingRow({ r, large = false }: { r: RankingEntry; large?: boolean }) 
         {r.mov}
       </span>
       <div className="hidden sm:flex items-center gap-4 font-mono text-[11px] text-ink-3">
-        <span title="Acertos">{r.correct}</span>
-        <span title="Exatos" className="text-green">{r.exact}</span>
-        <span title="Streak">{r.streak}</span>
+        <Tooltip content="Resultados certos: acertou ao menos o vencedor ou empate" side="top">
+          <span className="cursor-default">{r.correct}</span>
+        </Tooltip>
+        <Tooltip content="Placares exatos: acertou o placar perfeito — vale +10pts (grupos) ou +12pts (mata-mata)" side="top">
+          <span className="text-green cursor-default">{r.exact}</span>
+        </Tooltip>
+        <Tooltip content="Sequência de acertos consecutivos" side="top">
+          <span className="cursor-default">{r.streak}</span>
+        </Tooltip>
       </div>
       <span className={cn('font-display', large ? 'text-2xl' : 'text-xl')}>{fmtPts(r.pts)}</span>
     </div>
@@ -106,27 +113,27 @@ const SCORING_SECTIONS = [
   {
     label: 'FASE DE GRUPOS',
     rules: [
-      { pts: 10, label: 'Placar exato' },
-      { pts: 7,  label: 'Resultado + gols do vencedor' },
-      { pts: 5,  label: 'Resultado correto (V/E/D)' },
-      { pts: 1,  label: 'Gols de uma equipe acertados' },
+      { pts: 10, label: 'Placar exato',                  tip: 'Acertou o placar perfeito. ex: você palpitou 2×1 e o resultado foi 2×1.' },
+      { pts: 7,  label: 'Resultado + gols do vencedor',  tip: 'Acertou o resultado E os gols do time vencedor. ex: palpitou 3×0, real foi 3×1.' },
+      { pts: 5,  label: 'Resultado correto (V/E/D)',      tip: 'Acertou apenas quem ganhou ou que empatou. ex: palpitou 2×1, real foi 1×0.' },
+      { pts: 1,  label: 'Gols de uma equipe acertados',  tip: 'Acertou os gols de pelo menos um time. ex: palpitou 1×1, real foi 2×1 (acertou os gols do time visitante).' },
     ],
   },
   {
     label: 'MATA-MATA',
     rules: [
-      { pts: 12, label: 'Placar exato (tempo regulamentar)' },
-      { pts: 8,  label: 'Resultado + gols de um time' },
-      { pts: 5,  label: 'Resultado correto' },
-      { pts: 2,  label: 'Classificado (incl. prorr./pênaltis)' },
+      { pts: 12, label: 'Placar exato (tempo regulamentar)', tip: 'Placar perfeito nos 90 minutos. Prorrogação e pênaltis não contam para este critério.' },
+      { pts: 8,  label: 'Resultado + gols de um time',       tip: 'Acertou o resultado E os gols de ao menos um time no tempo regulamentar.' },
+      { pts: 5,  label: 'Resultado correto',                  tip: 'Acertou quem venceu no tempo regulamentar (sem contar prorr./pênaltis).' },
+      { pts: 2,  label: 'Classificado (incl. prorr./pênaltis)', tip: 'Acertou quem avança de fase — vale o resultado final, incluindo prorrogação e pênaltis.' },
     ],
   },
   {
     label: 'APOSTAS GERAIS',
     rules: [
-      { pts: 25, label: 'Campeão' },
-      { pts: 15, label: 'Vice-campeão' },
-      { pts: 10, label: 'Artilheiro (+ critério de desempate)' },
+      { pts: 25, label: 'Campeão',      tip: 'Acertou o campeão do mundo. Vale antes do início do torneio.' },
+      { pts: 15, label: 'Vice-campeão', tip: 'Acertou o vice-campeão. Campeão e vice não podem ser do mesmo grupo.' },
+      { pts: 10, label: 'Artilheiro (+ critério de desempate)', tip: 'Acertou o artilheiro da Copa. Em caso de empate nos gols, vale quem escolheu o jogador com mais gols.' },
     ],
   },
 ]
@@ -143,7 +150,11 @@ function ScoringRulesBox({ rules: _rules }: { rules: ScoringRule[] }) {
               {section.rules.map(r => (
                 <div key={r.label} className="flex items-center gap-2">
                   <span className="font-display text-xl text-green w-8 flex-shrink-0">+{r.pts}</span>
-                  <span className="font-mono text-[11px] text-ink-3">{r.label}</span>
+                  <Tooltip content={r.tip} side="top" maxWidth={260}>
+                    <span className="font-mono text-[11px] text-ink-3 cursor-default underline decoration-dotted decoration-ink-4 underline-offset-2">
+                      {r.label}
+                    </span>
+                  </Tooltip>
                 </div>
               ))}
             </div>

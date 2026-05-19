@@ -18,6 +18,7 @@ import {
   adminDeletePrediction,
   adminSetUserRole,
 } from '@/services/product'
+import { Tooltip } from '@/components/shared/Tooltip'
 import type { MarketStatus, MatchStatus, MatchStage } from '@/types'
 
 function marketStatusFor(status: MatchStatus): MarketStatus {
@@ -1048,7 +1049,11 @@ function AdminDesktop() {
                 {POINT_RULES.map(r => (
                   <div key={r.id} className="flex items-center gap-2">
                     <span className="font-display text-lg text-green w-7 flex-shrink-0">+{r.points}</span>
-                    <span className="font-mono text-[10px] text-ink-3">{r.label}</span>
+                    <Tooltip content={r.description} side="top" maxWidth={240}>
+                      <span className="font-mono text-[10px] text-ink-3 cursor-default underline decoration-dotted decoration-ink-4 underline-offset-2">
+                        {r.label}
+                      </span>
+                    </Tooltip>
                   </div>
                 ))}
               </div>
