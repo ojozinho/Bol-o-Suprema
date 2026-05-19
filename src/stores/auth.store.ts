@@ -271,8 +271,13 @@ export const useAuthStore = create<AuthState>()(
         })
 
         if (isSupabaseConfigured) {
+          // email comes from auth session — required for INSERT (NOT NULL), harmless on UPDATE
+          const { data: sessionData } = await supabase.auth.getSession()
+          const authEmail = sessionData?.session?.user?.email ?? current.email
+
           const { error } = await supabase.from('users').upsert({
             id: current.id,
+            email: authEmail,
             first_name: updated.firstName,
             last_name: updated.lastName,
             dept: updated.dept,
