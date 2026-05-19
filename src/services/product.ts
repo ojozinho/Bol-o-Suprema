@@ -111,26 +111,6 @@ export async function adminBulkMatchStatus(
   return ok(data as number)
 }
 
-export async function adminSettleMatchResult(
-  matchCode: string,
-  homeScore: number,
-  awayScore: number,
-  stage: string,
-  winner?: string
-) {
-  const blocked = requireSupabase()
-  if (blocked) return fail(blocked)
-  const { data, error } = await supabase.rpc('admin_settle_match_result', {
-    p_match_code:  matchCode,
-    p_home_score:  homeScore,
-    p_away_score:  awayScore,
-    p_stage:       stage,
-    p_winner:      winner ?? null,
-  })
-  if (error) return fail(error.message)
-  return ok(data as number)
-}
-
 export async function adminDeletePrediction(predictionId: string) {
   const blocked = requireSupabase()
   if (blocked) return fail(blocked)

@@ -12,9 +12,9 @@ import { cn } from '@/lib/utils'
 import { formatMatchDateTime } from '@/lib/matchTime'
 import {
   downloadCsv,
+  settleMatchResult,
   adminUpdateMatchStatus,
   adminBulkMatchStatus,
-  adminSettleMatchResult,
   adminDeletePrediction,
 } from '@/services/product'
 import type { MarketStatus, MatchStatus, MatchStage } from '@/types'
@@ -82,16 +82,13 @@ async function setMatchResult(
   matchCode: string,
   homeScore: number,
   awayScore: number,
-  stage: MatchStage
+  _stage: MatchStage
 ): Promise<{ scored: number; error: string | null }> {
-  const winner =
-    homeScore > awayScore ? WC2026_MATCHES.find(m => m.id === matchCode)?.home.code :
-    awayScore > homeScore ? WC2026_MATCHES.find(m => m.id === matchCode)?.away.code :
-    'draw'
-
-  const result = await adminSettleMatchResult(matchCode, homeScore, awayScore, stage, winner ?? undefined)
+  // settle_match_result RPC handles: match update + server-side scoring
+  // (via scoring_rules table) + ranking refresh + audit log + is_admin check
+  const result = await settleMatchResult(matchCode, homeScore, awayScore)
   if (result.error) return { scored: 0, error: result.error }
-  return { scored: result.data ?? 0, error: null }
+  return { scored: 0, error: null }
 }
 
 // ─── Status badge ──────────────────────────────────────────────────────────────
