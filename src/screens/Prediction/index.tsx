@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Flag } from '@/components/shared/Flag'
@@ -158,14 +158,22 @@ function StatusChip({ match }: { match: Match }) {
 // ─── Match row ────────────────────────────────────────────────────────────────
 
 function MatchRow({ match }: { match: Match }) {
-  const { predictions, confirmPrediction } = usePredictionStore()
+  const { predictions, drafts, setDraft, clearDraft, confirmPrediction } = usePredictionStore()
   const userId = useAuthStore(s => s.user?.id ?? 'me')
   const existing = predictions[match.id]
+  const draft = drafts[match.id]
 
   const [expanded, setExpanded] = useState(false)
-  const [home, setHome] = useState(existing?.homeScore ?? 0)
-  const [away, setAway] = useState(existing?.awayScore ?? 0)
+  const [home, setHome] = useState(draft?.home ?? existing?.homeScore ?? 0)
+  const [away, setAway] = useState(draft?.away ?? existing?.awayScore ?? 0)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (expanded) return
+    setHome(draft?.home ?? existing?.homeScore ?? 0)
+    setAway(draft?.away ?? existing?.awayScore ?? 0)
+  }, [draft?.home, draft?.away, existing?.homeScore, existing?.awayScore, expanded])
 
   const isPickable = isBetOpen(match)
   const isLocked = match.status === 'locked' || (!isPickable && (match.status === 'open' || match.status === 'scheduled'))
@@ -173,9 +181,20 @@ function MatchRow({ match }: { match: Match }) {
   const isDone = match.status === 'finished'
   const hasPick = !!existing
 
-  const handleConfirm = () => {
+  const updateHome = (value: number) => {
+    setHome(value)
+    setDraft(match.id, value, away)
+  }
+
+  const updateAway = (value: number) => {
+    setAway(value)
+    setDraft(match.id, home, value)
+  }
+
+  const handleConfirm = async () => {
     setSaveError(null)
-    const result = confirmPrediction({
+    setSaving(true)
+    const result = await confirmPrediction({
       id: `pred-${match.id}`,
       userId,
       matchId: match.id,
@@ -183,18 +202,20 @@ function MatchRow({ match }: { match: Match }) {
       awayScore: away,
       submittedAt: new Date().toISOString(),
     })
+    setSaving(false)
     if (!result.ok) {
       setSaveError(result.error ?? 'Erro ao salvar palpite.')
       return
     }
+    clearDraft(match.id)
     setExpanded(false)
   }
 
   const toggle = () => {
     if (!isPickable) return
     if (!expanded && existing) {
-      setHome(existing.homeScore)
-      setAway(existing.awayScore)
+      setHome(draft?.home ?? existing.homeScore)
+      setAway(draft?.away ?? existing.awayScore)
     }
     setExpanded(v => !v)
   }
@@ -294,7 +315,7 @@ function MatchRow({ match }: { match: Match }) {
                   <span className="font-mono text-[9px] font-bold text-center leading-tight">
                     {match.home.name.toUpperCase()}
                   </span>
-                  <ScoreInput value={home} onChange={setHome} />
+                  <ScoreInput value={home} onChange={updateHome} />
                 </div>
 
                 <span className="font-serif-it text-3xl text-ink-3 flex-shrink-0 mb-6">×</span>
@@ -304,7 +325,7 @@ function MatchRow({ match }: { match: Match }) {
                   <span className="font-mono text-[9px] font-bold text-center leading-tight">
                     {match.away.name.toUpperCase()}
                   </span>
-                  <ScoreInput value={away} onChange={setAway} />
+                  <ScoreInput value={away} onChange={updateAway} />
                 </div>
               </div>
 
@@ -316,9 +337,10 @@ function MatchRow({ match }: { match: Match }) {
 
               <button
                 onClick={handleConfirm}
-                className="btn-yellow w-full text-[11px] py-3 mt-3 tracking-eyebrow font-bold"
+                disabled={saving}
+                className="btn-yellow w-full text-[11px] py-3 mt-3 tracking-eyebrow font-bold disabled:opacity-50 disabled:cursor-wait"
               >
-                {hasPick ? 'ATUALIZAR PALPITE ✓' : 'CONFIRMAR PALPITE ✓'}
+                {saving ? 'SALVANDO...' : hasPick ? 'ATUALIZAR PALPITE ✓' : 'CONFIRMAR PALPITE ✓'}
               </button>
             </div>
           </motion.div>
@@ -415,6 +437,69 @@ function MiniStandings({ standings, totalMatches, filledMatches }: {
 }
 
 // ─── Groups tab ───────────────────────────────────────────────────────────────
+
+function GroupBatchSaveBar({ selectedGroup, matches, compact = false }: {
+  selectedGroup: string
+  matches: Match[]
+  compact?: boolean
+}) {
+  const { predictions, drafts, confirmPredictionBatch } = usePredictionStore()
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const openMatches = useMemo(() => matches.filter(m => isBetOpen(m)), [matches])
+  const savedCount = matches.filter(m => predictions[m.id]).length
+  const draftCount = matches.filter(m => drafts[m.id]).length
+  const canSave = openMatches.length > 0 && !saving
+
+  const handleSaveGroup = async () => {
+    setSaving(true)
+    setNotice(null)
+    const result = await confirmPredictionBatch(openMatches.map(match => {
+      const draft = drafts[match.id]
+      const existing = predictions[match.id]
+      return {
+        match,
+        homeScore: draft?.home ?? existing?.homeScore ?? 0,
+        awayScore: draft?.away ?? existing?.awayScore ?? 0,
+      }
+    }))
+    setSaving(false)
+    if (!result.ok) {
+      setNotice(result.error ?? 'Erro ao salvar grupo.')
+      return
+    }
+    const skipped = result.skipped > 0 ? ` · ${result.skipped} bloqueados` : ''
+    setNotice(`${result.saved} palpites salvos${skipped}`)
+  }
+
+  return (
+    <div className={cn(
+      'border-y border-hairline bg-paper-white px-4 py-3',
+      compact ? 'md:px-5' : ''
+    )}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="font-mono text-[9px] tracking-eyebrow text-ink-3">GRUPO {selectedGroup}</div>
+          <div className="font-mono text-[10px] text-ink-4">
+            {savedCount}/{matches.length} salvos
+            {draftCount > 0 ? ` · ${draftCount} em edicao` : ''}
+          </div>
+        </div>
+        <button
+          onClick={handleSaveGroup}
+          disabled={!canSave}
+          className="btn-yellow w-full px-3 py-2 text-[10px] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+        >
+          {saving ? 'SALVANDO...' : `SALVAR GRUPO ${selectedGroup}`}
+        </button>
+      </div>
+      {notice && (
+        <div className="mt-2 font-mono text-[10px] text-ink-3">{notice}</div>
+      )}
+    </div>
+  )
+}
 
 function GroupsTab() {
   const [selectedGroup, setSelectedGroup] = useState<string>('A')
@@ -550,6 +635,8 @@ function GroupsTab() {
           </div>
         </div>
       )}
+
+      <GroupBatchSaveBar selectedGroup={selectedGroup} matches={groupMatches} />
 
       {/* Matchdays */}
       {[1, 2, 3].map(md => {
@@ -1056,6 +1143,8 @@ function DesktopGroupView({
         <span className="ml-auto font-mono text-[10px] text-ink-3">{countInGroup}/6 palpites</span>
       </div>
 
+      <GroupBatchSaveBar selectedGroup={selectedGroup} matches={groupMatches} compact />
+
       {[1, 2, 3].map(md => {
         const matches = allMatches.filter(
           m => m.group === selectedGroup && m.stageLabel.endsWith(`MD${md}`)
@@ -1149,6 +1238,10 @@ export function PredictionScreen() {
   const [selectedGroup, setSelectedGroup] = useState(initialGroup)
   const { predictions } = usePredictionStore()
   const isDesktop = useIsDesktop()
+
+  useEffect(() => {
+    setSelectedGroup(initialGroup)
+  }, [initialGroup])
 
   const predMap = useMemo(() => {
     const m: Record<string, { homeScore: number; awayScore: number }> = {}

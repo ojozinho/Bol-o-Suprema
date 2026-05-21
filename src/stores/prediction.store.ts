@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Prediction } from '@/types'
+import type { Match, Prediction } from '@/types'
 import { supabase, isMockMode } from '@/lib/supabase'
 import { WC2026_MATCHES } from '@/data/wc2026'
 import { isBetOpen } from '@/lib/markets'
@@ -12,14 +12,24 @@ interface PredictionResult {
   error?: string
 }
 
-interface PredictionState {
-  predictions: Record<string, Prediction> // matchId → Prediction
-  drafts: Record<string, { home: number; away: number }> // matchId → draft
+interface PredictionBatchResult extends PredictionResult {
+  saved: number
+  skipped: number
+}
 
-  // apostas gerais (antes do início do torneio)
-  championPick: string | null  // campeão — 25 pts
-  vicePick: string | null      // vice-campeão — 15 pts
-  scorerPick: string | null    // artilheiro (nome do jogador) — 10 pts + desempate
+interface PredictionBatchItem {
+  match: Match
+  homeScore: number
+  awayScore: number
+}
+
+interface PredictionState {
+  predictions: Record<string, Prediction>
+  drafts: Record<string, { home: number; away: number }>
+
+  championPick: string | null
+  vicePick: string | null
+  scorerPick: string | null
 
   lastError: string | null
   _userId: string | undefined
@@ -29,7 +39,8 @@ interface PredictionState {
 
   setDraft: (matchId: string, home: number, away: number) => void
   clearDraft: (matchId: string) => void
-  confirmPrediction: (prediction: Prediction) => PredictionResult
+  confirmPrediction: (prediction: Prediction) => Promise<PredictionResult>
+  confirmPredictionBatch: (items: PredictionBatchItem[]) => Promise<PredictionBatchResult>
   removePrediction: (matchId: string) => void
   clearAllPredictions: () => Promise<void>
   clearError: () => void
@@ -40,217 +51,317 @@ interface PredictionState {
   setScorerPick: (playerName: string) => void
 }
 
+type PredictionRow = {
+  id: string
+  user_id: string
+  match_code: string
+  home_score: number
+  away_score: number
+  submitted_at: string
+  points_earned?: number | null
+}
+
+function toPrediction(row: PredictionRow): Prediction {
+  return {
+    id:           row.id,
+    userId:       row.user_id,
+    matchId:      row.match_code,
+    homeScore:    row.home_score,
+    awayScore:    row.away_score,
+    submittedAt:  row.submitted_at,
+    pointsEarned: row.points_earned ?? undefined,
+  }
+}
+
+function mergeMatchWithOverride(matchId: string): Match | null {
+  const baseMatch = WC2026_MATCHES.find(m => m.id === matchId)
+  const override = useMatchStore.getState().getOverride(matchId)
+  if (!baseMatch) return null
+  if (!override) return baseMatch
+  return {
+    ...baseMatch,
+    status:       override.status,
+    marketStatus: override.marketStatus ?? undefined,
+    lockedAt:     override.lockedAt ?? null,
+    settledAt:    override.settledAt ?? null,
+    kickoffUtc:   override.kickoffUtc ?? baseMatch.kickoffUtc,
+  }
+}
+
+async function savePredictionFallback(userId: string, prediction: Prediction): Promise<Prediction> {
+  const payload = {
+    user_id:      userId,
+    match_code:   prediction.matchId,
+    home_score:   prediction.homeScore,
+    away_score:   prediction.awayScore,
+    submitted_at: prediction.submittedAt,
+  }
+
+  const { data: existing, error: lookupError } = await supabase
+    .from('predictions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('match_code', prediction.matchId)
+    .maybeSingle()
+
+  if (lookupError) throw new Error(lookupError.message)
+
+  if (existing?.id) {
+    const { data, error } = await supabase
+      .from('predictions')
+      .update(payload)
+      .eq('id', existing.id)
+      .select('id,user_id,match_code,home_score,away_score,submitted_at,points_earned')
+      .single()
+    if (error) throw new Error(error.message)
+    return toPrediction(data as PredictionRow)
+  }
+
+  const { data, error } = await supabase
+    .from('predictions')
+    .insert(payload)
+    .select('id,user_id,match_code,home_score,away_score,submitted_at,points_earned')
+    .single()
+  if (error) throw new Error(error.message)
+  return toPrediction(data as PredictionRow)
+}
+
+async function savePredictionBatchFallback(userId: string, predictions: Prediction[]): Promise<Prediction[]> {
+  const saved: Prediction[] = []
+  for (const prediction of predictions) {
+    saved.push(await savePredictionFallback(userId, prediction))
+  }
+  return saved
+}
+
 export const usePredictionStore = create<PredictionState>()(
-    (set, get) => ({
-      predictions: {},
-      drafts: {},
-      championPick: null,
-      vicePick: null,
-      scorerPick: null,
-      lastError: null,
-      _userId: undefined,
+  (set, get) => ({
+    predictions: {},
+    drafts: {},
+    championPick: null,
+    vicePick: null,
+    scorerPick: null,
+    lastError: null,
+    _userId: undefined,
 
-      setUserId: (id) => set({ _userId: id }),
+    setUserId: (id) => set({ _userId: id }),
 
-      // ── Sync from Supabase on login ─────────────────────────────────────────
+    syncFromSupabase: async (userId) => {
+      if (isMockMode) return
 
-      syncFromSupabase: async (userId) => {
-        if (isMockMode) return
-        const { data } = await supabase
-          .from('predictions')
-          .select('*')
-          .eq('user_id', userId)
-          .not('match_code', 'is', null)
+      const { data } = await supabase
+        .from('predictions')
+        .select('*')
+        .eq('user_id', userId)
+        .not('match_code', 'is', null)
 
-        const predictions: Record<string, Prediction> = {}
-        for (const row of data ?? []) {
-          if (!row.match_code) continue
-          predictions[row.match_code] = {
-            id:           row.id,
-            userId:       row.user_id,
-            matchId:      row.match_code,
-            homeScore:    row.home_score,
-            awayScore:    row.away_score,
-            submittedAt:  row.submitted_at,
-            pointsEarned: row.points_earned ?? undefined,
-          }
-        }
-        set({ predictions })
+      const predictions: Record<string, Prediction> = {}
+      for (const row of data ?? []) {
+        if (!row.match_code) continue
+        predictions[row.match_code] = toPrediction(row as PredictionRow)
+      }
+      set({ predictions })
 
-        // Sync general picks from users table
-        const { data: user } = await supabase
-          .from('users')
-          .select('champion_pick, vice_pick, scorer_pick')
-          .eq('id', userId)
-          .single()
+      const { data: user } = await supabase
+        .from('users')
+        .select('champion_pick, vice_pick, scorer_pick')
+        .eq('id', userId)
+        .single()
 
-        if (user) {
-          set({
-            championPick: user.champion_pick ?? null,
-            vicePick:     user.vice_pick     ?? null,
-            scorerPick:   user.scorer_pick   ?? null,
-          })
-        }
-      },
+      if (user) {
+        set({
+          championPick: user.champion_pick ?? null,
+          vicePick:     user.vice_pick     ?? null,
+          scorerPick:   user.scorer_pick   ?? null,
+        })
+      }
+    },
 
-      // ── Drafts (local only) ─────────────────────────────────────────────────
+    setDraft: (matchId, home, away) =>
+      set((s) => ({ drafts: { ...s.drafts, [matchId]: { home, away } } })),
 
-      setDraft: (matchId, home, away) =>
-        set((s) => ({ drafts: { ...s.drafts, [matchId]: { home, away } } })),
+    clearDraft: (matchId) =>
+      set((s) => {
+        const drafts = { ...s.drafts }
+        delete drafts[matchId]
+        return { drafts }
+      }),
 
-      clearDraft: (matchId) =>
-        set((s) => {
-          const drafts = { ...s.drafts }
-          delete drafts[matchId]
-          return { drafts }
-        }),
+    confirmPrediction: async (prediction) => {
+      const match = mergeMatchWithOverride(prediction.matchId)
+      if (match && !isBetOpen(match)) {
+        const error = 'Mercado fechado ou bloqueado. Este palpite nao foi salvo.'
+        set({ lastError: error })
+        return { ok: false, error }
+      }
 
-      // ── confirmPrediction: local + Supabase upsert ──────────────────────────
+      const userId = get()._userId
+      let savedPrediction = prediction
 
-      confirmPrediction: (prediction) => {
-        const baseMatch = WC2026_MATCHES.find(m => m.id === prediction.matchId)
-        const override = useMatchStore.getState().getOverride(prediction.matchId)
-        // Merge with null-coalescing so a null kickoffUtc in the DB override
-        // never overwrites the static kickoff — same logic as useMatchesWithStatus.
-        const match = baseMatch
-          ? override
-              ? {
-                  ...baseMatch,
-                  status:      override.status,
-                  marketStatus: override.marketStatus ?? undefined,
-                  lockedAt:    override.lockedAt ?? null,
-                  settledAt:   override.settledAt ?? null,
-                  kickoffUtc:  override.kickoffUtc ?? baseMatch.kickoffUtc,
-                }
-              : baseMatch
-          : null
-        if (match && !isBetOpen(match)) {
-          const error = 'Mercado fechado ou bloqueado. Este palpite nao foi salvo.'
+      if (!isMockMode) {
+        if (!userId) {
+          const error = 'Sessao indisponivel. Entre novamente para salvar o palpite.'
           set({ lastError: error })
           return { ok: false, error }
         }
 
-        set((s) => {
-          const predictions = { ...s.predictions, [prediction.matchId]: prediction }
-          const drafts = { ...s.drafts }
+        try {
+          savedPrediction = await savePredictionFallback(userId, prediction)
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err)
+          console.error('[Predictions] Save error:', error)
+          set({ lastError: error })
+          return { ok: false, error }
+        }
+      }
+
+      set((s) => {
+        const predictions = { ...s.predictions, [savedPrediction.matchId]: savedPrediction }
+        const drafts = { ...s.drafts }
+        delete drafts[savedPrediction.matchId]
+        return { predictions, drafts, lastError: null }
+      })
+
+      return { ok: true }
+    },
+
+    confirmPredictionBatch: async (items) => {
+      const userId = get()._userId
+      const submittedAt = new Date().toISOString()
+      const pickable = items.filter(item => isBetOpen(item.match))
+      const skipped = items.length - pickable.length
+
+      if (!pickable.length) {
+        const error = 'Nenhuma partida aberta para salvar nesta fase.'
+        set({ lastError: error })
+        return { ok: false, error, saved: 0, skipped }
+      }
+
+      if (!isMockMode && !userId) {
+        const error = 'Sessao indisponivel. Entre novamente para salvar os palpites.'
+        set({ lastError: error })
+        return { ok: false, error, saved: 0, skipped }
+      }
+
+      const predictionsToSave = pickable.map(({ match, homeScore, awayScore }) => ({
+        id:          `pred-${match.id}`,
+        userId:      userId ?? 'me',
+        matchId:     match.id,
+        homeScore,
+        awayScore,
+        submittedAt,
+      }))
+
+      let saved = predictionsToSave
+
+      if (!isMockMode && userId) {
+        try {
+          const payload = predictionsToSave.map(p => ({
+            match_code: p.matchId,
+            home_score: p.homeScore,
+            away_score: p.awayScore,
+            submitted_at: p.submittedAt,
+          }))
+
+          const { data, error } = await supabase.rpc('save_match_predictions', {
+            p_predictions: payload,
+          })
+
+          if (error) {
+            const isMissingRpc =
+              error.code === 'PGRST202' ||
+              error.message.toLowerCase().includes('save_match_predictions')
+            if (!isMissingRpc) throw new Error(error.message)
+            saved = await savePredictionBatchFallback(userId, predictionsToSave)
+          } else {
+            saved = ((data ?? []) as PredictionRow[]).map(toPrediction)
+          }
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err)
+          console.error('[Predictions] Batch save error:', error)
+          set({ lastError: error })
+          return { ok: false, error, saved: 0, skipped }
+        }
+      }
+
+      set((s) => {
+        const predictions = { ...s.predictions }
+        const drafts = { ...s.drafts }
+        for (const prediction of saved) {
+          predictions[prediction.matchId] = prediction
           delete drafts[prediction.matchId]
-          return { predictions, drafts, lastError: null }
-        })
-
-        const userId = get()._userId
-        if (!isMockMode && userId) {
-          const matchId = prediction.matchId
-          // onConflict upsert fails with partial indexes — use select→update/insert instead
-          supabase
-            .from('predictions')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('match_code', matchId)
-            .maybeSingle()
-            .then(async ({ data: existing }) => {
-              let saveError: string | null = null
-              if (existing?.id) {
-                const { error } = await supabase
-                  .from('predictions')
-                  .update({
-                    home_score:   prediction.homeScore,
-                    away_score:   prediction.awayScore,
-                    submitted_at: prediction.submittedAt,
-                  })
-                  .eq('id', existing.id)
-                saveError = error?.message ?? null
-              } else {
-                const { error } = await supabase
-                  .from('predictions')
-                  .insert({
-                    user_id:      userId,
-                    match_code:   matchId,
-                    home_score:   prediction.homeScore,
-                    away_score:   prediction.awayScore,
-                    submitted_at: prediction.submittedAt,
-                  })
-                saveError = error?.message ?? null
-              }
-              if (saveError) {
-                console.error('[Predictions] Save error:', saveError)
-                set((s) => {
-                  const predictions = { ...s.predictions }
-                  delete predictions[matchId]
-                  return { predictions, lastError: saveError }
-                })
-              }
-            })
         }
-        return { ok: true }
-      },
+        return { predictions, drafts, lastError: null }
+      })
 
-      removePrediction: (matchId) =>
-        set((s) => {
-          const predictions = { ...s.predictions }
-          delete predictions[matchId]
-          return { predictions }
-        }),
+      return { ok: true, saved: saved.length, skipped }
+    },
 
-      clearAllPredictions: async () => {
-        set({ predictions: {}, drafts: {}, championPick: null, vicePick: null, scorerPick: null, lastError: null })
-        useBracketStore.getState().clearAllPicks()
-        const userId = get()._userId
-        if (!isMockMode && userId) {
-          const [{ error: predErr }, { error: bracketErr }, { error: userErr }] = await Promise.all([
-            supabase.from('predictions').delete().eq('user_id', userId),
-            supabase.from('bracket_picks').delete().eq('user_id', userId),
-            supabase.from('users').update({ champion_pick: null, vice_pick: null, scorer_pick: null }).eq('id', userId),
-          ])
-          if (predErr)    console.error('[clearPredictions] predictions:', predErr.message)
-          if (bracketErr) console.error('[clearPredictions] bracket_picks:', bracketErr.message)
-          if (userErr)    console.error('[clearPredictions] users:', userErr.message)
-        }
-      },
+    removePrediction: (matchId) =>
+      set((s) => {
+        const predictions = { ...s.predictions }
+        delete predictions[matchId]
+        return { predictions }
+      }),
 
-      clearError: () => set({ lastError: null }),
+    clearAllPredictions: async () => {
+      set({ predictions: {}, drafts: {}, championPick: null, vicePick: null, scorerPick: null, lastError: null })
+      useBracketStore.getState().clearAllPicks()
+      const userId = get()._userId
+      if (!isMockMode && userId) {
+        const [{ error: predErr }, { error: bracketErr }, { error: userErr }] = await Promise.all([
+          supabase.from('predictions').delete().eq('user_id', userId),
+          supabase.from('bracket_picks').delete().eq('user_id', userId),
+          supabase.from('users').update({ champion_pick: null, vice_pick: null, scorer_pick: null }).eq('id', userId),
+        ])
+        if (predErr)    console.error('[clearPredictions] predictions:', predErr.message)
+        if (bracketErr) console.error('[clearPredictions] bracket_picks:', bracketErr.message)
+        if (userErr)    console.error('[clearPredictions] users:', userErr.message)
+      }
+    },
 
-      getPrediction: (matchId) => get().predictions[matchId],
-      getDraft: (matchId) => get().drafts[matchId],
+    clearError: () => set({ lastError: null }),
 
-      // ── General picks: local + sync to users table ──────────────────────────
+    getPrediction: (matchId) => get().predictions[matchId],
+    getDraft: (matchId) => get().drafts[matchId],
 
-      setChampionPick: (teamCode) => {
-        const value = teamCode || null
-        const validation = validateChampionVice(value, get().vicePick)
-        if (!validation.valid) {
-          set({ lastError: validation.error })
-          return
-        }
-        set({ championPick: value, lastError: null })
-        const uid = get()._userId
-        if (!isMockMode && uid) {
-          supabase.from('users').update({ champion_pick: value }).eq('id', uid)
-            .then(({ error }) => { if (error) set({ lastError: error.message }) })
-        }
-      },
+    setChampionPick: (teamCode) => {
+      const value = teamCode || null
+      const validation = validateChampionVice(value, get().vicePick)
+      if (!validation.valid) {
+        set({ lastError: validation.error })
+        return
+      }
+      set({ championPick: value, lastError: null })
+      const uid = get()._userId
+      if (!isMockMode && uid) {
+        supabase.from('users').update({ champion_pick: value }).eq('id', uid)
+          .then(({ error }) => { if (error) set({ lastError: error.message }) })
+      }
+    },
 
-      setVicePick: (teamCode) => {
-        const value = teamCode || null
-        const validation = validateChampionVice(get().championPick, value)
-        if (!validation.valid) {
-          set({ lastError: validation.error })
-          return
-        }
-        set({ vicePick: value, lastError: null })
-        const uid = get()._userId
-        if (!isMockMode && uid) {
-          supabase.from('users').update({ vice_pick: value }).eq('id', uid)
-            .then(({ error }) => { if (error) set({ lastError: error.message }) })
-        }
-      },
+    setVicePick: (teamCode) => {
+      const value = teamCode || null
+      const validation = validateChampionVice(get().championPick, value)
+      if (!validation.valid) {
+        set({ lastError: validation.error })
+        return
+      }
+      set({ vicePick: value, lastError: null })
+      const uid = get()._userId
+      if (!isMockMode && uid) {
+        supabase.from('users').update({ vice_pick: value }).eq('id', uid)
+          .then(({ error }) => { if (error) set({ lastError: error.message }) })
+      }
+    },
 
-      setScorerPick: (playerName) => {
-        set({ scorerPick: playerName, lastError: null })
-        const uid = get()._userId
-        if (!isMockMode && uid) {
-          supabase.from('users').update({ scorer_pick: playerName }).eq('id', uid)
-            .then(({ error }) => { if (error) console.error('[Predictions] scorer_pick:', error.message) })
-        }
-      },
-    })
+    setScorerPick: (playerName) => {
+      set({ scorerPick: playerName, lastError: null })
+      const uid = get()._userId
+      if (!isMockMode && uid) {
+        supabase.from('users').update({ scorer_pick: playerName }).eq('id', uid)
+          .then(({ error }) => { if (error) console.error('[Predictions] scorer_pick:', error.message) })
+      }
+    },
+  })
 )

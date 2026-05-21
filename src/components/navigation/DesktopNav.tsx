@@ -43,13 +43,13 @@ export function DesktopNav() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-paper/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-screen-xl items-center gap-8 px-6 h-14">
+      <div className="mx-auto flex max-w-screen-xl items-center gap-4 px-4 h-14 xl:gap-8 xl:px-6">
 
         <button onClick={() => navigate('/home')} className="flex-shrink-0">
           <Logo height={48} />
         </button>
 
-        <nav className="flex items-center gap-1 flex-1">
+        <nav className="flex items-center gap-1 flex-1 overflow-x-auto no-scrollbar">
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.path
             return (
@@ -57,7 +57,7 @@ export function DesktopNav() {
                 <button
                   onClick={() => navigate(item.path)}
                   className={cn(
-                    'px-3 py-1.5 font-mono text-[11px] font-bold tracking-eyebrow uppercase transition-all active:scale-95 active:opacity-70',
+                    'whitespace-nowrap px-3 py-1.5 font-mono text-[11px] font-bold tracking-eyebrow uppercase transition-all active:scale-95 active:opacity-70',
                     active
                       ? 'bg-ink text-paper'
                       : 'text-ink-3 hover:text-ink hover:bg-hairline'
